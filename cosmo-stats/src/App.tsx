@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Switch, Route, Redirect } from 'react-router-dom';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { FrequencyChart } from './components/FrequencyChart';
 import { Dashboard } from './components/Dashboard';
@@ -21,11 +21,13 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/frequency" element={<FrequencyChart />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Switch>
+          <Route exact path="/" component={Dashboard} />
+          <Route path="/frequency" component={FrequencyChart} />
+          <Route path="*">
+            <Redirect to="/" />
+          </Route>
+        </Switch>
       </Router>
     </ThemeProvider>
   );

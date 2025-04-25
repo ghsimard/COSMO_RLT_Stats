@@ -1,10 +1,14 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useHistory } from 'react-router-dom';
 import { Button, Container, Typography, Box, Paper } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
 
 export const Dashboard: React.FC = () => {
-  const navigate = useNavigate();
+  const history = useHistory();
+
+  const handleNavigateToFrequency = () => {
+    history.push('/frequency');
+  };
 
   return (
     <div className="dashboard">
@@ -43,7 +47,7 @@ export const Dashboard: React.FC = () => {
                   color="primary"
                   size="large"
                   startIcon={<BarChartIcon />}
-                  onClick={() => navigate('/frequency')}
+                  onClick={handleNavigateToFrequency}
                 >
                   Distribución de Frecuencias
                 </Button>
