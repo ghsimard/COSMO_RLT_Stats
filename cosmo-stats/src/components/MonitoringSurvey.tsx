@@ -17,7 +17,9 @@ import {
   DialogActions,
   CircularProgress,
   Alert,
-  Chip
+  Chip,
+  Divider,
+  Tooltip
 } from '@mui/material';
 import ContactPhoneIcon from '@mui/icons-material/ContactPhone';
 import EmailIcon from '@mui/icons-material/Email';
@@ -46,6 +48,9 @@ interface ContactDialogProps {
 }
 
 const ContactDialog: React.FC<ContactDialogProps> = ({ open, onClose, school }) => {
+  const isPersonalPreferred = school.preferredContact?.toLowerCase().includes('personal');
+  const isInstitutionalPreferred = school.preferredContact?.toLowerCase().includes('institucional');
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Información de Contacto</DialogTitle>
@@ -53,25 +58,54 @@ const ContactDialog: React.FC<ContactDialogProps> = ({ open, onClose, school }) 
         <Box py={2}>
           <Typography variant="h6" gutterBottom>{school.schoolName}</Typography>
           <Typography variant="subtitle1" gutterBottom>
-            <strong>Rector:</strong> {school.rectorName}
+            {school.rectorName}
           </Typography>
-          <Box display="flex" flexDirection="column" gap={1} mt={2}>
-            <Typography variant="body1">
-              <EmailIcon sx={{ mr: 1 }} />
-              Correo Personal: {school.personalEmail}
-            </Typography>
-            <Typography variant="body1">
-              <EmailIcon sx={{ mr: 1 }} />
-              Correo Institucional: {school.institutionalEmail}
-            </Typography>
-            <Typography variant="body1">
-              <PhoneIcon sx={{ mr: 1 }} />
-              Teléfono Personal: {school.personalPhone}
-            </Typography>
-            <Typography variant="body1">
-              <PhoneIcon sx={{ mr: 1 }} />
-              Teléfono Institucional: {school.institutionalPhone}
-            </Typography>
+
+          <Box display="flex" flexDirection="column" gap={2} mt={2}>
+            {/* Personal Contact Information */}
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: isPersonalPreferred ? '#e3f2fd' : 'transparent',
+              borderRadius: 1
+            }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Contacto Personal
+              </Typography>
+              <Box display="flex" flexDirection="column" gap={1}>
+                <Typography variant="body1">
+                  <EmailIcon sx={{ mr: 1 }} />
+                  {school.personalEmail}
+                </Typography>
+                <Typography variant="body1">
+                  <PhoneIcon sx={{ mr: 1 }} />
+                  {school.personalPhone}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Institutional Contact Information */}
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: isInstitutionalPreferred ? '#e3f2fd' : 'transparent',
+              borderRadius: 1
+            }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Contacto Institucional
+              </Typography>
+              <Box display="flex" flexDirection="column" gap={1}>
+                <Typography variant="body1">
+                  <EmailIcon sx={{ mr: 1 }} />
+                  {school.institutionalEmail}
+                </Typography>
+                <Typography variant="body1">
+                  <PhoneIcon sx={{ mr: 1 }} />
+                  {school.institutionalPhone}
+                </Typography>
+              </Box>
+            </Box>
+
+            <Divider sx={{ my: 1 }} />
+            
             <Typography variant="body1">
               <ContactPhoneIcon sx={{ mr: 1 }} />
               Contacto preferido: {school.preferredContact}
@@ -157,7 +191,8 @@ export const MonitoringSurvey: React.FC = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Institución Educativa</TableCell>
+                    <TableCell>Institución</TableCell>
+                    <TableCell>Rector</TableCell>
                     <TableCell align="center">Docentes</TableCell>
                     <TableCell align="center">Estudiantes</TableCell>
                     <TableCell align="center">Acudientes</TableCell>
@@ -167,8 +202,9 @@ export const MonitoringSurvey: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {schools.map((school) => (
-                    <TableRow key={school.schoolName}>
+                    <TableRow key={`${school.schoolName}-${school.rectorName}`}>
                       <TableCell>{school.schoolName}</TableCell>
+                      <TableCell>{school.rectorName}</TableCell>
                       <TableCell align="center">
                         {getSubmissionStatus(school.submissions.docentes)}
                       </TableCell>
@@ -179,21 +215,40 @@ export const MonitoringSurvey: React.FC = () => {
                         {getSubmissionStatus(school.submissions.acudientes)}
                       </TableCell>
                       <TableCell align="center">
-                        <Chip
+                        <Chip 
                           label={school.meetingRequirements ? "Completo" : "Pendiente"}
                           color={school.meetingRequirements ? "success" : "warning"}
                         />
                       </TableCell>
                       <TableCell align="center">
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          startIcon={<ContactPhoneIcon />}
-                          onClick={() => handleContactClick(school)}
-                          disabled={school.meetingRequirements}
-                        >
-                          Contactar
-                        </Button>
+                        <Tooltip title={school.meetingRequirements ? "Esta institución ya alcanzó el límite requerido de respuestas" : ""}>
+                          <span>
+                            <Button
+                              variant="contained"
+                              color="primary"
+                              size="small"
+                              startIcon={<ContactPhoneIcon />}
+                              onClick={() => handleContactClick(school)}
+                              disabled={school.meetingRequirements}
+                              sx={{
+                                borderRadius: 2,
+                                textTransform: 'none',
+                                minWidth: '120px',
+                                '&:hover': {
+                                  backgroundColor: 'primary.dark',
+                                  transform: 'translateY(-1px)',
+                                  transition: 'transform 0.2s'
+                                },
+                                '&.Mui-disabled': {
+                                  backgroundColor: 'rgba(0, 0, 0, 0.12)',
+                                  color: 'rgba(0, 0, 0, 0.26)'
+                                }
+                              }}
+                            >
+                              Contactar
+                            </Button>
+                          </span>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))}
