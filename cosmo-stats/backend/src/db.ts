@@ -1,10 +1,9 @@
-import { Pool } from 'pg';
-import { DatabaseConfig } from './types';
-import dotenv from 'dotenv';
+const { Pool } = require('pg');
+const dotenv = require('dotenv');
 
 dotenv.config();
 
-const dbConfig: DatabaseConfig = {
+const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'COSMO_RLT',
@@ -17,7 +16,7 @@ console.log('Attempting to connect to database with config:', {
   password: '***' // Hide password in logs
 });
 
-export const pool = new Pool(dbConfig);
+const pool = new Pool(dbConfig);
 
 // Test the connection
 pool.query('SELECT NOW()')
@@ -28,7 +27,7 @@ pool.query('SELECT NOW()')
     console.error('Error connecting to the database:', err);
   });
 
-export async function getTableColumns(tableName: string): Promise<string[]> {
+async function getTableColumns(tableName) {
   const query = `
     SELECT column_name 
     FROM information_schema.columns 
@@ -43,4 +42,6 @@ export async function getTableColumns(tableName: string): Promise<string[]> {
     console.error(`Error getting columns for table ${tableName}:`, error);
     throw error;
   }
-} 
+}
+
+module.exports = { pool, getTableColumns }; 

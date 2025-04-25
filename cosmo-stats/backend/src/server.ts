@@ -9,6 +9,15 @@ const port = process.env.PORT || 4001;
 app.use(cors());
 app.use(express.json());
 
+// Test query to check table access and column names
+pool.query('SELECT column_name FROM information_schema.columns WHERE table_name = \'docentes_form_submissions\'')
+  .then(result => {
+    console.log('Columns in docentes_form_submissions:', result.rows.map(row => row.column_name));
+  })
+  .catch(err => {
+    console.error('Error querying column names:', err);
+  });
+
 // Test query to check table access
 pool.query('SELECT COUNT(*) FROM docentes_form_submissions')
   .then(result => {
@@ -16,6 +25,18 @@ pool.query('SELECT COUNT(*) FROM docentes_form_submissions')
   })
   .catch(err => {
     console.error('Error querying docentes_form_submissions:', err);
+  });
+
+// Test query to check column names in rectores table
+pool.query('SELECT column_name FROM information_schema.columns WHERE table_name = \'rectores\' ORDER BY ordinal_position')
+  .then(result => {
+    console.log('All columns in rectores table:');
+    result.rows.forEach(row => {
+      console.log('-', row.column_name);
+    });
+  })
+  .catch(err => {
+    console.error('Error querying rectores column names:', err);
   });
 
 const sections: Record<string, SectionConfig> = {
@@ -219,7 +240,7 @@ async function calculateFrequencies(tableName: string, question: string, section
   const query = `
     SELECT 
       key as question,
-      value as rating,
+      LOWER(TRIM(value)) as rating,
       COUNT(*) as count
     FROM ${tableName},
       jsonb_each_text(${columnName}) as x(key, value)
@@ -245,21 +266,24 @@ async function calculateFrequencies(tableName: string, question: string, section
       console.log(`WARNING: No results found for question "${question}" in table ${tableName}`);
       // Try a broader query to see what questions exist
       const checkQuery = `
-        SELECT DISTINCT key 
+        SELECT DISTINCT key, COUNT(DISTINCT value) as value_count
         FROM ${tableName},
           jsonb_each_text(${columnName}) as x(key, value)
+        GROUP BY key
         LIMIT 5;
       `;
       const { rows: checkRows } = await pool.query(checkQuery);
-      console.log(`Sample questions in ${tableName}:`, checkRows.map(r => r.key));
+      console.log(`Sample questions in ${tableName} with value counts:`, checkRows);
+      return { S: -1, A: -1, N: -1 }; // Indicate no data available
     }
 
     let total = 0;
     const counts: Record<string, number> = { S: 0, A: 0, N: 0 };
+    const unrecognizedRatings: Set<string> = new Set();
 
     rows.forEach(row => {
       const count = parseInt(row.count);
-      const rating = row.rating.toLowerCase();
+      const rating = row.rating.toLowerCase().trim();
       console.log(`Processing: Rating="${rating}", Count=${count}`);
       
       total += count;
@@ -270,17 +294,27 @@ async function calculateFrequencies(tableName: string, question: string, section
       } else if (rating.includes('nunca')) {
         counts.N += count;
       } else {
+        unrecognizedRatings.add(rating);
         console.log(`WARNING: Unrecognized rating "${rating}"`);
       }
     });
 
+    if (unrecognizedRatings.size > 0) {
+      console.log(`WARNING: Found unrecognized ratings:`, Array.from(unrecognizedRatings));
+    }
+
     // Log the totals
     console.log(`Totals - S: ${counts.S}, A: ${counts.A}, N: ${counts.N}, Total: ${total}`);
 
+    if (total === 0) {
+      console.log(`WARNING: No valid responses found for question "${question}"`);
+      return { S: -1, A: -1, N: -1 }; // Indicate no valid data
+    }
+
     const result = {
-      S: total > 0 ? Math.round((counts.S / total) * 100) : 0,
-      A: total > 0 ? Math.round((counts.A / total) * 100) : 0,
-      N: total > 0 ? Math.round((counts.N / total) * 100) : 0
+      S: Math.round((counts.S / total) * 100),
+      A: Math.round((counts.A / total) * 100),
+      N: Math.round((counts.N / total) * 100)
     };
 
     console.log(`Final percentages:`, result);
@@ -288,7 +322,7 @@ async function calculateFrequencies(tableName: string, question: string, section
   } catch (error) {
     console.error(`Error in calculateFrequencies:`, error);
     console.error(`Failed query parameters:`, { tableName, question, section, columnName });
-    return { S: 0, A: 0, N: 0 };
+    return { S: -1, A: -1, N: -1 }; // Indicate error condition
   }
 }
 
@@ -326,6 +360,116 @@ app.get('/api/frequency-ratings', async (req, res) => {
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
+  }
+});
+
+// Add new types for monitoring
+interface SchoolMonitoringData {
+  schoolName: string;
+  rectorName: string;
+  personalEmail: string;
+  institutionalEmail: string;
+  personalPhone: string;
+  institutionalPhone: string;
+  preferredContact: string;
+  submissions: {
+    docentes: number;
+    estudiantes: number;
+    acudientes: number;
+  };
+  meetingRequirements: boolean;
+}
+
+// Add new endpoint for monitoring data
+app.get('/api/monitoring', async (req, res) => {
+  try {
+    // Get all unique schools and rector contact information from rectores table
+    const schoolsQuery = `
+      SELECT DISTINCT 
+        "nombre_de_la_institucion_educativa_en_la_actualmente_desempena_" as school_name,
+        nombre_s_y_apellido_s_completo_s as rector_name,
+        correo_electronico_personal as personal_email,
+        correo_electronico_institucional_el_que_usted_usa_en_su_rol_com as institutional_email,
+        numero_de_celular_personal as personal_phone,
+        telefono_de_contacto_de_la_ie as institutional_phone,
+        prefiere_recibir_comunicaciones_en_el_correo as preferred_contact
+      FROM rectores
+    `;
+    console.log('Executing schools query:', schoolsQuery);
+    const schoolsResult = await pool.query(schoolsQuery);
+    console.log('Schools query result:', schoolsResult.rows);
+    
+    // For each school, get submission counts from the form submission tables
+    const monitoringData: SchoolMonitoringData[] = await Promise.all(
+      schoolsResult.rows.map(async (school) => {
+        // Log the school data we're working with
+        console.log('Processing school:', school);
+        
+        const docentesQuery = `
+          SELECT COUNT(*) as count 
+          FROM docentes_form_submissions 
+          WHERE institucion_educativa = $1
+        `;
+        console.log('Executing docentes query:', docentesQuery, 'with value:', school.school_name);
+        
+        const counts = await Promise.all([
+          pool.query(docentesQuery, [school.school_name]),
+          pool.query(`
+            SELECT COUNT(*) as count 
+            FROM estudiantes_form_submissions 
+            WHERE institucion_educativa = $1
+          `, [school.school_name]),
+          pool.query(`
+            SELECT COUNT(*) as count 
+            FROM acudientes_form_submissions 
+            WHERE institucion_educativa = $1
+          `, [school.school_name])
+        ]);
+
+        const submissions = {
+          docentes: parseInt(counts[0].rows[0].count),
+          estudiantes: parseInt(counts[1].rows[0].count),
+          acudientes: parseInt(counts[2].rows[0].count)
+        };
+
+        console.log('Submission counts for school:', school.school_name, submissions);
+
+        const meetingRequirements = 
+          submissions.docentes >= 25 && 
+          submissions.estudiantes >= 25 && 
+          submissions.acudientes >= 25;
+
+        return {
+          schoolName: school.school_name,
+          rectorName: school.rector_name,
+          personalEmail: school.personal_email,
+          institutionalEmail: school.institutional_email,
+          personalPhone: school.personal_phone,
+          institutionalPhone: school.institutional_phone,
+          preferredContact: school.preferred_contact,
+          submissions,
+          meetingRequirements
+        };
+      })
+    );
+
+    res.json(monitoringData);
+  } catch (error) {
+    console.error('Error fetching monitoring data:', error);
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        // @ts-ignore
+        position: error.position,
+        // @ts-ignore
+        detail: error.detail,
+        // @ts-ignore
+        hint: error.hint
+      });
+    }
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

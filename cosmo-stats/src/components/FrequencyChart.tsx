@@ -69,13 +69,17 @@ export const FrequencyChart: React.FC = () => {
     if (value === null || value === undefined || value === "NA") {
       return '';
     }
+    if (value === -1) {
+      return 'Sin datos';
+    }
     return `${value}%`;
   };
 
   const getCellStyle = (value: number | null | undefined | string, rating: string, isLastInGroup: boolean) => {
     const numValue = typeof value === 'number' ? value : parseInt(value as string);
-    const shouldEmphasize = rating === 'S' && !isNaN(numValue) && numValue < 50;
-    const isNA = value === "NA";
+    const shouldEmphasize = rating === 'S' && !isNaN(numValue) && numValue < 50 && numValue !== -1;
+    const isNA = value === "NA" || value === null || value === undefined;
+    const isNoData = value === -1;
 
     return {
       borderRight: isLastInGroup ? '2px solid #e0e0e0' : 'none',
@@ -87,6 +91,13 @@ export const FrequencyChart: React.FC = () => {
       }),
       ...(isNA && {
         backgroundImage: 'repeating-linear-gradient(45deg, #ffffff, #ffffff 8px, #f0f0f0 8px, #f0f0f0 16px)',
+        color: '#666666',
+        fontStyle: 'italic'
+      }),
+      ...(isNoData && {
+        backgroundColor: '#f5f5f5',
+        color: '#666666',
+        fontStyle: 'italic'
       })
     };
   };

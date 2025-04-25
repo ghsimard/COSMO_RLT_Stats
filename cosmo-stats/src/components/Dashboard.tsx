@@ -1,13 +1,18 @@
 import React from 'react';
 import { useHistory } from 'react-router-dom';
-import { Button, Container, Typography, Box, Paper } from '@mui/material';
+import { Button, Container, Typography, Box, Paper, Stack } from '@mui/material';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 
 export const Dashboard: React.FC = () => {
   const history = useHistory();
 
   const handleNavigateToFrequency = () => {
     history.push('/frequency');
+  };
+
+  const handleNavigateToMonitoring = () => {
+    history.push('/monitoring');
   };
 
   return (
@@ -17,14 +22,14 @@ export const Dashboard: React.FC = () => {
           <Box py={4} display="flex" alignItems="center" gap={2}>
             <img 
               src="/images/LogoCosmo.png"
-              alt="COSMO Schools Logo" 
+              alt="Logo" 
               style={{ 
                 height: '50px',
                 width: 'auto'
               }} 
             />
             <Typography variant="h3" component="h1" gutterBottom sx={{ mb: 0 }}>
-              COSMO Dashboard
+              Dashboard
             </Typography>
           </Box>
         </Container>
@@ -42,15 +47,26 @@ export const Dashboard: React.FC = () => {
               </Typography>
               
               <Box mt={4}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  startIcon={<BarChartIcon />}
-                  onClick={handleNavigateToFrequency}
-                >
-                  Distribución de Frecuencias
-                </Button>
+                <Stack direction="row" spacing={2}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    startIcon={<BarChartIcon />}
+                    onClick={handleNavigateToFrequency}
+                  >
+                    Distribución de Frecuencias
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    size="large"
+                    startIcon={<AssessmentIcon />}
+                    onClick={handleNavigateToMonitoring}
+                  >
+                    Encuesta Monitoreo
+                  </Button>
+                </Stack>
               </Box>
             </Box>
           </Paper>
