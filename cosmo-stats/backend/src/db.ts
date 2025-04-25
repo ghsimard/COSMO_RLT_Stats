@@ -1,0 +1,46 @@
+import { Pool } from 'pg';
+import { DatabaseConfig } from './types';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const dbConfig: DatabaseConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  database: process.env.DB_NAME || 'COSMO_RLT',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || ''
+};
+
+console.log('Attempting to connect to database with config:', {
+  ...dbConfig,
+  password: '***' // Hide password in logs
+});
+
+export const pool = new Pool(dbConfig);
+
+// Test the connection
+pool.query('SELECT NOW()')
+  .then(() => {
+    console.log('Successfully connected to the database');
+  })
+  .catch(err => {
+    console.error('Error connecting to the database:', err);
+  });
+
+export async function getTableColumns(tableName: string): Promise<string[]> {
+  const query = `
+    SELECT column_name 
+    FROM information_schema.columns 
+    WHERE table_name = $1
+  `;
+  
+  try {
+    const { rows } = await pool.query(query, [tableName]);
+    console.log(`Found columns for table ${tableName}:`, rows.map(r => r.column_name));
+    return rows.map(row => row.column_name);
+  } catch (error) {
+    console.error(`Error getting columns for table ${tableName}:`, error);
+    throw error;
+  }
+} 
