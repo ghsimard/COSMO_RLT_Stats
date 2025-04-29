@@ -1,0 +1,65 @@
+INFORMES DE ENCUESTAS
+
+Create a PDF report (Informe - Encuesta de Ambiante Escolar) for each School found in the database.   
+
+The PDF report will have the following sections:
+    Section 1 (Page 1): Page Title
+        Use page 1 as a reference from the file MODELO DE INFORME EAE-Form.pdf inside this project
+
+    Section 2 (Page 2 and 3): ENCUESTA DE AMBIANTE ESCOLAR
+         Use the text from the file MODELO DE INFORME EAE-Form.pdf inside this project
+
+    Section 3 (Page 4): IDENTIFICACION
+        DIRECTIVO/A DOCENTE: (value from cargo_actual linked to the school)
+        ENTIDAD TERRITORIAL: (value from entidad_territorial linked to the school)
+        INSTITUCION EDUCATIVA: (value from nombre_de_la_institucion_educativa_en_la_actualmente_desempena_ linked to the school).  
+
+Section 4 (Page 4): ENCUESTADOS
+    There will be 3 sub-sections. 
+    There is no color scheme or specific color
+    There is no charting library preference 
+        DOCENTES 
+            Values are coming from docentes_form_submissions table):  This section will show the number of records found for the linked school and some charts (xx encuestados).  Next we will see charts (add a legend) to the charts):
+                "En que grados tiene clases?" (Donut chart ) showing the percentage.
+                "En que jordan tiene clases?" (Donut chart) showing the percentage.
+                "Cuantos anos lleva en la IE?" (bar chart): x value from anos_como_docente. Show the count of unique values
+                "Usted recibe retroalimentacion de" (bar chart)
+        ESTUDIANTES
+            Values are coming from estudiantes_form_submissions table):  This section will show the number of records found for the linked school and some charts (xx encuestados).  Next we will see charts (add a legend) to the charts):
+                "En que grados te encuentras?" (Donut chart ) showing the percentage.
+                "En que jordana tienes clase?" (Donut chart) showing the percentage.
+                "Cuantos anos llevas en el colegio?" (bar chart): x values from anos_estudiando
+    ACUDIENTES (This section is a table with one row)
+            Values are coming from acudientes_form_submissions table):  This section will show the number of records found for the linked school and some charts (xx encuestados).  Next we will see table:
+                "en que grado se encuentran los estudiantes que representa?" (table )
+
+    For the bar chart showing years, show only the unique values.
+
+Section 5 (Page 5): RESUMEN GENERAL
+    This page will show three stacked bar charts shown in percentage. 
+    Add a legend to the charts
+    Add the numeric count of each unique.
+    Calculated from the raw data
+        Docentes
+            Comunicacion
+            Praticas pedagogicas
+            Convivencia
+        Estudiantes
+            Comunicacion
+            Praticas pedagogicas
+            Convivencia
+        Acudientes
+            Comunicacion
+            Praticas pedagogicas
+            Convivencia
+
+Section 6 (Page 6-7): FORTALEZAS Y RETOS
+    Use the same pattern and the same layout as in the component "FrequencyChart".  But with a small change in the query.  
+    Fetch the data coming only from the school linked to this report.
+    Don't modify the existing FrequencyChart component.  Just use it as a reference to create a new one specific for the PDF generation.
+    
+To resume, each school will have a report (pdf) of their results coming from the database. 
+
+Incomplete pdf: When there is at  least, one section that is missing values, its is consider INCOMPLETE.  If the pdf is incomplete, create it with the fielname INCOMPLETE_schoolname.pdf and just put blank values where there are missing. Inlude all sections but with blank/placeholder values. 
+
+You will store each pdf (one per school) into a directory.  The filename for each will be the school name.  It has to be saved in order of school name.  Add a sequence number in front of the filename will be padded with zeros (0001). You can save all the reports into "INFORMES DE ENCUESTAS"
