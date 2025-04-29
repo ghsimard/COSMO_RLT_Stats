@@ -28,6 +28,7 @@ import PhoneIcon from '@mui/icons-material/Phone';
 interface SchoolMonitoringData {
   schoolName: string;
   rectorName: string;
+  currentPosition: string;
   personalEmail: string;
   institutionalEmail: string;
   personalPhone: string;
@@ -51,6 +52,9 @@ const ContactDialog: React.FC<ContactDialogProps> = ({ open, onClose, school }) 
   const isPersonalPreferred = school.preferredContact?.toLowerCase().includes('personal');
   const isInstitutionalPreferred = school.preferredContact?.toLowerCase().includes('institucional');
 
+  console.log('ContactDialog - school data:', school);
+  console.log('ContactDialog - currentPosition:', school.currentPosition);
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Información de Contacto</DialogTitle>
@@ -59,6 +63,9 @@ const ContactDialog: React.FC<ContactDialogProps> = ({ open, onClose, school }) 
           <Typography variant="h6" gutterBottom>{school.schoolName}</Typography>
           <Typography variant="subtitle1" gutterBottom>
             {school.rectorName}
+          </Typography>
+          <Typography variant="subtitle2" color="textSecondary" gutterBottom>
+            {school.currentPosition || 'Cargo no especificado'}
           </Typography>
 
           <Box display="flex" flexDirection="column" gap={2} mt={2}>
@@ -132,6 +139,8 @@ export const MonitoringSurvey: React.FC = () => {
         const response = await fetch('http://localhost:4001/api/monitoring');
         if (!response.ok) throw new Error('Error al cargar los datos');
         const data = await response.json();
+        console.log('API Response:', data);
+        console.log('First school currentPosition:', data[0]?.currentPosition);
         setSchools(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -192,7 +201,6 @@ export const MonitoringSurvey: React.FC = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell>Institución</TableCell>
-                    <TableCell>Rector</TableCell>
                     <TableCell align="center">Docentes</TableCell>
                     <TableCell align="center">Estudiantes</TableCell>
                     <TableCell align="center">Acudientes</TableCell>
@@ -204,7 +212,6 @@ export const MonitoringSurvey: React.FC = () => {
                   {schools.map((school) => (
                     <TableRow key={`${school.schoolName}-${school.rectorName}`}>
                       <TableCell>{school.schoolName}</TableCell>
-                      <TableCell>{school.rectorName}</TableCell>
                       <TableCell align="center">
                         {getSubmissionStatus(school.submissions.docentes)}
                       </TableCell>

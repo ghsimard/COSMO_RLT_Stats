@@ -367,6 +367,7 @@ app.get('/api/frequency-ratings', async (req, res) => {
 interface SchoolMonitoringData {
   schoolName: string;
   rectorName: string;
+  currentPosition: string;
   personalEmail: string;
   institutionalEmail: string;
   personalPhone: string;
@@ -388,6 +389,7 @@ app.get('/api/monitoring', async (req, res) => {
       SELECT DISTINCT 
         "nombre_de_la_institucion_educativa_en_la_actualmente_desempena_" as school_name,
         nombre_s_y_apellido_s_completo_s as rector_name,
+        cargo_actual as current_position,
         correo_electronico_personal as personal_email,
         correo_electronico_institucional_el_que_usted_usa_en_su_rol_com as institutional_email,
         numero_de_celular_personal as personal_phone,
@@ -397,20 +399,30 @@ app.get('/api/monitoring', async (req, res) => {
     `;
     console.log('Executing schools query:', schoolsQuery);
     const schoolsResult = await pool.query(schoolsQuery);
-    console.log('Schools query result:', schoolsResult.rows);
     
-    // For each school, get submission counts from the form submission tables
+    console.log('\n=== Raw Database Results ===');
+    schoolsResult.rows.forEach((row, index) => {
+      console.log(`\nSchool ${index + 1}:`, {
+        school_name: row.school_name,
+        cargo_actual: row.cargo_actual,
+        current_position: row.current_position
+      });
+    });
+
     const monitoringData: SchoolMonitoringData[] = await Promise.all(
       schoolsResult.rows.map(async (school) => {
-        // Log the school data we're working with
-        console.log('Processing school:', school);
-        
+        console.log('\n=== Processing School ===');
+        console.log('Raw school data:', {
+          school_name: school.school_name,
+          cargo_actual: school.cargo_actual,
+          current_position: school.current_position
+        });
+
         const docentesQuery = `
           SELECT COUNT(*) as count 
           FROM docentes_form_submissions 
           WHERE institucion_educativa = $1
         `;
-        console.log('Executing docentes query:', docentesQuery, 'with value:', school.school_name);
         
         const counts = await Promise.all([
           pool.query(docentesQuery, [school.school_name]),
@@ -432,24 +444,24 @@ app.get('/api/monitoring', async (req, res) => {
           acudientes: parseInt(counts[2].rows[0].count)
         };
 
-        console.log('Submission counts for school:', school.school_name, submissions);
-
-        const meetingRequirements = 
-          submissions.docentes >= 25 && 
-          submissions.estudiantes >= 25 && 
-          submissions.acudientes >= 25;
-
-        return {
+        const mappedData = {
           schoolName: school.school_name,
           rectorName: school.rector_name,
+          currentPosition: school.cargo_actual || 'Rector',
           personalEmail: school.personal_email,
           institutionalEmail: school.institutional_email,
           personalPhone: school.personal_phone,
           institutionalPhone: school.institutional_phone,
           preferredContact: school.preferred_contact,
           submissions,
-          meetingRequirements
+          meetingRequirements: 
+            submissions.docentes >= 25 && 
+            submissions.estudiantes >= 25 && 
+            submissions.acudientes >= 25
         };
+
+        console.log('Mapped data:', mappedData);
+        return mappedData;
       })
     );
 
