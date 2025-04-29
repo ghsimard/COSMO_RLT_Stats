@@ -21,29 +21,29 @@ app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 // Test query to check table access and column names
 db_1.pool.query('SELECT column_name FROM information_schema.columns WHERE table_name = \'docentes_form_submissions\'')
-    .then(result => {
-    console.log('Columns in docentes_form_submissions:', result.rows.map(row => row.column_name));
+    .then((result) => {
+    console.log('Columns in docentes_form_submissions:', result.rows.map((row) => row.column_name));
 })
-    .catch(err => {
+    .catch((err) => {
     console.error('Error querying column names:', err);
 });
 // Test query to check table access
 db_1.pool.query('SELECT COUNT(*) FROM docentes_form_submissions')
-    .then(result => {
+    .then((result) => {
     console.log('Successfully queried docentes_form_submissions. Row count:', result.rows[0].count);
 })
-    .catch(err => {
+    .catch((err) => {
     console.error('Error querying docentes_form_submissions:', err);
 });
 // Test query to check column names in rectores table
 db_1.pool.query('SELECT column_name FROM information_schema.columns WHERE table_name = \'rectores\' ORDER BY ordinal_position')
-    .then(result => {
+    .then((result) => {
     console.log('All columns in rectores table:');
-    result.rows.forEach(row => {
+    result.rows.forEach((row) => {
         console.log('-', row.column_name);
     });
 })
-    .catch(err => {
+    .catch((err) => {
     console.error('Error querying rectores column names:', err);
 });
 const sections = {
@@ -239,13 +239,13 @@ const getColumnName = (section) => {
 function calculateFrequencies(tableName, question, section) {
     return __awaiter(this, void 0, void 0, function* () {
         if (question === 'NA') {
-            return { S: "NA", A: "NA", N: "NA" };
+            return { S: -1, A: -1, N: -1 };
         }
         const columnName = getColumnName(section);
         const query = `
     SELECT 
       key as question,
-      value as rating,
+      LOWER(TRIM(value)) as rating,
       COUNT(*) as count
     FROM ${tableName},
       jsonb_each_text(${columnName}) as x(key, value)
@@ -267,19 +267,22 @@ function calculateFrequencies(tableName, question, section) {
                 console.log(`WARNING: No results found for question "${question}" in table ${tableName}`);
                 // Try a broader query to see what questions exist
                 const checkQuery = `
-        SELECT DISTINCT key 
+        SELECT DISTINCT key, COUNT(DISTINCT value) as value_count
         FROM ${tableName},
           jsonb_each_text(${columnName}) as x(key, value)
+        GROUP BY key
         LIMIT 5;
       `;
                 const { rows: checkRows } = yield db_1.pool.query(checkQuery);
-                console.log(`Sample questions in ${tableName}:`, checkRows.map(r => r.key));
+                console.log(`Sample questions in ${tableName} with value counts:`, checkRows);
+                return { S: -1, A: -1, N: -1 }; // Indicate no data available
             }
             let total = 0;
             const counts = { S: 0, A: 0, N: 0 };
-            rows.forEach(row => {
+            const unrecognizedRatings = new Set();
+            rows.forEach((row) => {
                 const count = parseInt(row.count);
-                const rating = row.rating.toLowerCase();
+                const rating = row.rating.toLowerCase().trim();
                 console.log(`Processing: Rating="${rating}", Count=${count}`);
                 total += count;
                 if (rating.includes('siempre')) {
@@ -292,15 +295,23 @@ function calculateFrequencies(tableName, question, section) {
                     counts.N += count;
                 }
                 else {
+                    unrecognizedRatings.add(rating);
                     console.log(`WARNING: Unrecognized rating "${rating}"`);
                 }
             });
+            if (unrecognizedRatings.size > 0) {
+                console.log(`WARNING: Found unrecognized ratings:`, Array.from(unrecognizedRatings));
+            }
             // Log the totals
             console.log(`Totals - S: ${counts.S}, A: ${counts.A}, N: ${counts.N}, Total: ${total}`);
+            if (total === 0) {
+                console.log(`WARNING: No valid responses found for question "${question}"`);
+                return { S: -1, A: -1, N: -1 }; // Indicate no valid data
+            }
             const result = {
-                S: total > 0 ? Math.round((counts.S / total) * 100) : 0,
-                A: total > 0 ? Math.round((counts.A / total) * 100) : 0,
-                N: total > 0 ? Math.round((counts.N / total) * 100) : 0
+                S: Math.round((counts.S / total) * 100),
+                A: Math.round((counts.A / total) * 100),
+                N: Math.round((counts.N / total) * 100)
             };
             console.log(`Final percentages:`, result);
             return result;
@@ -308,7 +319,7 @@ function calculateFrequencies(tableName, question, section) {
         catch (error) {
             console.error(`Error in calculateFrequencies:`, error);
             console.error(`Failed query parameters:`, { tableName, question, section, columnName });
-            return { S: 0, A: 0, N: 0 };
+            return { S: -1, A: -1, N: -1 }; // Indicate error condition
         }
     });
 }
@@ -353,6 +364,7 @@ app.get('/api/monitoring', (req, res) => __awaiter(void 0, void 0, void 0, funct
       SELECT DISTINCT 
         "nombre_de_la_institucion_educativa_en_la_actualmente_desempena_" as school_name,
         nombre_s_y_apellido_s_completo_s as rector_name,
+        cargo_actual as current_position,
         correo_electronico_personal as personal_email,
         correo_electronico_institucional_el_que_usted_usa_en_su_rol_com as institutional_email,
         numero_de_celular_personal as personal_phone,
@@ -362,17 +374,26 @@ app.get('/api/monitoring', (req, res) => __awaiter(void 0, void 0, void 0, funct
     `;
         console.log('Executing schools query:', schoolsQuery);
         const schoolsResult = yield db_1.pool.query(schoolsQuery);
-        console.log('Schools query result:', schoolsResult.rows);
-        // For each school, get submission counts from the form submission tables
+        console.log('\n=== Raw Database Results ===');
+        schoolsResult.rows.forEach((row, index) => {
+            console.log(`\nSchool ${index + 1}:`, {
+                school_name: row.school_name,
+                cargo_actual: row.cargo_actual,
+                current_position: row.current_position
+            });
+        });
         const monitoringData = yield Promise.all(schoolsResult.rows.map((school) => __awaiter(void 0, void 0, void 0, function* () {
-            // Log the school data we're working with
-            console.log('Processing school:', school);
+            console.log('\n=== Processing School ===');
+            console.log('Raw school data:', {
+                school_name: school.school_name,
+                cargo_actual: school.cargo_actual,
+                current_position: school.current_position
+            });
             const docentesQuery = `
           SELECT COUNT(*) as count 
           FROM docentes_form_submissions 
           WHERE institucion_educativa = $1
         `;
-            console.log('Executing docentes query:', docentesQuery, 'with value:', school.school_name);
             const counts = yield Promise.all([
                 db_1.pool.query(docentesQuery, [school.school_name]),
                 db_1.pool.query(`
@@ -391,21 +412,22 @@ app.get('/api/monitoring', (req, res) => __awaiter(void 0, void 0, void 0, funct
                 estudiantes: parseInt(counts[1].rows[0].count),
                 acudientes: parseInt(counts[2].rows[0].count)
             };
-            console.log('Submission counts for school:', school.school_name, submissions);
-            const meetingRequirements = submissions.docentes >= 25 &&
-                submissions.estudiantes >= 25 &&
-                submissions.acudientes >= 25;
-            return {
+            const mappedData = {
                 schoolName: school.school_name,
                 rectorName: school.rector_name,
+                currentPosition: school.cargo_actual || 'Rector',
                 personalEmail: school.personal_email,
                 institutionalEmail: school.institutional_email,
                 personalPhone: school.personal_phone,
                 institutionalPhone: school.institutional_phone,
                 preferredContact: school.preferred_contact,
                 submissions,
-                meetingRequirements
+                meetingRequirements: submissions.docentes >= 25 &&
+                    submissions.estudiantes >= 25 &&
+                    submissions.acudientes >= 25
             };
+            console.log('Mapped data:', mappedData);
+            return mappedData;
         })));
         res.json(monitoringData);
     }

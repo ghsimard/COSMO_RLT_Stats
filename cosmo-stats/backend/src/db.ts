@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+import { Pool } from 'pg';
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -16,7 +16,7 @@ console.log('Attempting to connect to database with config:', {
   password: '***' // Hide password in logs
 });
 
-const pool = new Pool(dbConfig);
+export const pool = new Pool(dbConfig);
 
 // Test the connection
 pool.query('SELECT NOW()')
@@ -27,7 +27,7 @@ pool.query('SELECT NOW()')
     console.error('Error connecting to the database:', err);
   });
 
-async function getTableColumns(tableName) {
+export async function getTableColumns(tableName: string): Promise<string[]> {
   const query = `
     SELECT column_name 
     FROM information_schema.columns 
@@ -42,6 +42,4 @@ async function getTableColumns(tableName) {
     console.error(`Error getting columns for table ${tableName}:`, error);
     throw error;
   }
-}
-
-module.exports = { pool, getTableColumns }; 
+} 

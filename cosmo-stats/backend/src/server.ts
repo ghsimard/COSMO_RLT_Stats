@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { pool } from './db';
 import { FrequencyData, SectionConfig, GridItem, FrequencyResult } from './types';
+import { QueryResult } from 'pg';
 
 const app = express();
 const port = process.env.PORT || 4001;
@@ -11,31 +12,31 @@ app.use(express.json());
 
 // Test query to check table access and column names
 pool.query('SELECT column_name FROM information_schema.columns WHERE table_name = \'docentes_form_submissions\'')
-  .then(result => {
-    console.log('Columns in docentes_form_submissions:', result.rows.map(row => row.column_name));
+  .then((result: QueryResult) => {
+    console.log('Columns in docentes_form_submissions:', result.rows.map((row: { column_name: string }) => row.column_name));
   })
-  .catch(err => {
+  .catch((err: Error) => {
     console.error('Error querying column names:', err);
   });
 
 // Test query to check table access
 pool.query('SELECT COUNT(*) FROM docentes_form_submissions')
-  .then(result => {
+  .then((result: QueryResult) => {
     console.log('Successfully queried docentes_form_submissions. Row count:', result.rows[0].count);
   })
-  .catch(err => {
+  .catch((err: Error) => {
     console.error('Error querying docentes_form_submissions:', err);
   });
 
 // Test query to check column names in rectores table
 pool.query('SELECT column_name FROM information_schema.columns WHERE table_name = \'rectores\' ORDER BY ordinal_position')
-  .then(result => {
+  .then((result: QueryResult) => {
     console.log('All columns in rectores table:');
-    result.rows.forEach(row => {
+    result.rows.forEach((row: { column_name: string }) => {
       console.log('-', row.column_name);
     });
   })
-  .catch(err => {
+  .catch((err: Error) => {
     console.error('Error querying rectores column names:', err);
   });
 
@@ -233,7 +234,7 @@ const getColumnName = (section: string) => {
 
 async function calculateFrequencies(tableName: string, question: string, section: string): Promise<FrequencyResult> {
   if (question === 'NA') {
-    return { S: "NA", A: "NA", N: "NA" } as unknown as FrequencyResult;
+    return { S: -1, A: -1, N: -1 };
   }
 
   const columnName = getColumnName(section);
@@ -281,7 +282,7 @@ async function calculateFrequencies(tableName: string, question: string, section
     const counts: Record<string, number> = { S: 0, A: 0, N: 0 };
     const unrecognizedRatings: Set<string> = new Set();
 
-    rows.forEach(row => {
+    rows.forEach((row: { rating: string; count: string }) => {
       const count = parseInt(row.count);
       const rating = row.rating.toLowerCase().trim();
       console.log(`Processing: Rating="${rating}", Count=${count}`);

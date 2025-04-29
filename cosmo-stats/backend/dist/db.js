@@ -8,15 +8,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.pool = void 0;
 exports.getTableColumns = getTableColumns;
 const pg_1 = require("pg");
-const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config();
+const dotenv = require('dotenv');
+dotenv.config();
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432'),
