@@ -1357,16 +1357,38 @@ app.get('/api/generate-pdf', async (req, res) => {
               return;
             }
 
+            // Normalize values to ensure they sum to 100%
+            const actualTotal = values.S + values.A + values.N;
+            const normalizedValues = {
+              S: Math.round((values.S / actualTotal) * 100),
+              A: Math.round((values.A / actualTotal) * 100),
+              N: Math.round((values.N / actualTotal) * 100)
+            };
+
+            // Adjust for rounding errors to ensure sum is exactly 100
+            const sum = normalizedValues.S + normalizedValues.A + normalizedValues.N;
+            if (sum > 100) {
+              // Remove excess from the largest value
+              const max = Math.max(normalizedValues.S, normalizedValues.A, normalizedValues.N);
+              if (max === normalizedValues.S) normalizedValues.S -= (sum - 100);
+              else if (max === normalizedValues.A) normalizedValues.A -= (sum - 100);
+              else normalizedValues.N -= (sum - 100);
+            } else if (sum < 100) {
+              // Add remainder to the largest value
+              const max = Math.max(normalizedValues.S, normalizedValues.A, normalizedValues.N);
+              if (max === normalizedValues.S) normalizedValues.S += (100 - sum);
+              else if (max === normalizedValues.A) normalizedValues.A += (100 - sum);
+              else normalizedValues.N += (100 - sum);
+            }
+
             let currentX = sectionStartX + stackedBarLabelWidth;
-            const total = values.S + values.A + values.N;
             
             // Draw S segment (Blue)
-            const sWidth = (values.S / 100) * stackedBarWidth;
+            const sWidth = (normalizedValues.S / 100) * stackedBarWidth;
+            doc.rect(currentX, y, sWidth, barHeight)
+               .fillColor('#4472C4')
+               .fill();
             if (values.S > 0) {
-              doc.rect(currentX, y, sWidth, barHeight)
-                 .fillColor('#4472C4')
-                 .fill();
-              // Add percentage text
               doc.fillColor('white')
                  .fontSize(8)
                  .text(`${values.S}%`,
@@ -1377,12 +1399,11 @@ app.get('/api/generate-pdf', async (req, res) => {
             currentX += sWidth;
 
             // Draw A segment (Yellow)
-            const aWidth = (values.A / 100) * stackedBarWidth;
+            const aWidth = (normalizedValues.A / 100) * stackedBarWidth;
+            doc.rect(currentX, y, aWidth, barHeight)
+               .fillColor('#FFC000')
+               .fill();
             if (values.A > 0) {
-              doc.rect(currentX, y, aWidth, barHeight)
-                 .fillColor('#FFC000')
-                 .fill();
-              // Add percentage text
               doc.fillColor('black')
                  .fontSize(8)
                  .text(`${values.A}%`,
@@ -1393,12 +1414,11 @@ app.get('/api/generate-pdf', async (req, res) => {
             currentX += aWidth;
 
             // Draw N segment (Red)
-            const nWidth = (values.N / 100) * stackedBarWidth;
+            const nWidth = (normalizedValues.N / 100) * stackedBarWidth;
+            doc.rect(currentX, y, nWidth, barHeight)
+               .fillColor('#FF0000')
+               .fill();
             if (values.N > 0) {
-              doc.rect(currentX, y, nWidth, barHeight)
-                 .fillColor('#FF0000')
-                 .fill();
-              // Add percentage text
               doc.fillColor('white')
                  .fontSize(8)
                  .text(`${values.N}%`,
