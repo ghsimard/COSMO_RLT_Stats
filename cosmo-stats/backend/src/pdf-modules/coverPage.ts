@@ -186,14 +186,17 @@ export const generateCoverPage = async (doc: CustomPDFKit, school?: string): Pro
 
     // Add ENTIDAD TERRITORIAL below school name
     const entidadText = await getEntidadTerritorial(school);
-    const labelWidth = doc.widthOfString('ENTIDAD TERRITORIAL: ');
-    const totalWidth = doc.widthOfString(`ENTIDAD TERRITORIAL: ${entidadText}`);
-    const startX = (pageWidth - totalWidth) / 2;
     
+    // Center align the entire text
     doc.fontSize(14)
        .font('Helvetica-Bold')
-       .text('ENTIDAD TERRITORIAL:     ', startX, doc.y, { continued: true })
+       .text('ENTIDAD TERRITORIAL: ', {
+         align: 'center',
+         continued: true
+       })
        .font('Helvetica')
-       .text(entidadText);
+       .text(entidadText, {
+         align: 'center'
+       });
   }
 }; 
