@@ -36,9 +36,21 @@ export const FrequencyChart: React.FC = () => {
       try {
         const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/monitoring`);
         if (!response.ok) throw new Error('Error al cargar las escuelas');
-        const data = await response.json();
-        const schoolNames = data.map((school: any) => school.schoolName);
-        setSchools(schoolNames);
+        
+        // Add type definition for the response data
+        interface SchoolData {
+          schoolName: string;
+          [key: string]: any; // Allow other properties
+        }
+        
+        const data = await response.json() as SchoolData[];
+        const schoolNames = data.map(school => school.schoolName);
+        
+        // Remove duplicate school names
+        const uniqueSchools = Array.from(new Set(schoolNames));
+        console.log(`Removed ${schoolNames.length - uniqueSchools.length} duplicate school names`);
+        
+        setSchools(uniqueSchools);
       } catch (err) {
         console.error('Error fetching schools:', err);
       }
@@ -286,8 +298,8 @@ export const FrequencyChart: React.FC = () => {
           label="Escuela"
           onChange={handleSchoolChange}
         >
-          {schools.map((school) => (
-            <MenuItem key={school} value={school}>
+          {schools.map((school, index) => (
+            <MenuItem key={`school-${index}`} value={school}>
               {school}
             </MenuItem>
           ))}

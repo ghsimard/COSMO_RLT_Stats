@@ -371,7 +371,7 @@ export const generateSummaryPage = async (doc: CustomPDFKit, school: string): Pr
 
   // Get frequency data first
   const frequencyData = await getFrequencyData(school);
-
+  
   // Add DOCENTES section
   doc.moveDown(2);
   const sectionStartX = 40;
@@ -535,34 +535,44 @@ export const generateSummaryPage = async (doc: CustomPDFKit, school: string): Pr
   drawStackedBar('Prácticas pedagógicas', docentesAvgPracticas, barStartY + barHeight + 10);
   drawStackedBar('Convivencia', docentesAvgConvivencia, barStartY + (barHeight + 10) * 2);
 
-  // Add legend
-  const stackedBarLegendY = barStartY + (barHeight + 10) * 3 + 10;
-  const stackedBarLegendSpacing = 80;
+  // Add legend - Moving it directly under the last bar
+  const stackedBarLegendY = barStartY + (barHeight + 10) * 3;
+  
+  // Place legend at the beginning of the stacked bars
+  doc.fontSize(8)
+     .fillColor('black');
+     
+  // Calculate positions - Start exactly at the beginning of the bars
+  const legendStartX = sectionStartX + stackedBarLabelWidth; // Start of bars
+  const boxSize = 12;
+  const textMargin = 16;
+  const legendSpacing = 70; // Space between legend items
+  const moveAVecesRight = 40; // Additional spacing to move "A veces" more to the right
   
   // S legend
-  doc.rect(sectionStartX, stackedBarLegendY, 12, 12)
+  doc.rect(legendStartX, stackedBarLegendY, boxSize, boxSize)
      .fillColor('#4472C4')
      .fill();
   doc.fillColor('black')
-     .fontSize(8)
-     .text('Siempre/Casi siempre', sectionStartX + 16, stackedBarLegendY + 2);
+     .text('Siempre/Casi siempre', legendStartX + textMargin, stackedBarLegendY + 2);
 
-  // A legend
-  doc.rect(sectionStartX + stackedBarLegendSpacing * 1.5, stackedBarLegendY, 12, 12)
+  // A legend - moved more to the right
+  doc.rect(legendStartX + legendSpacing + moveAVecesRight, stackedBarLegendY, boxSize, boxSize)
      .fillColor('#FFC000')
      .fill();
   doc.fillColor('black')
-     .text('A veces', sectionStartX + stackedBarLegendSpacing * 1.5 + 16, stackedBarLegendY + 2);
+     .text('A veces', legendStartX + legendSpacing + moveAVecesRight + textMargin, stackedBarLegendY + 2);
 
-  // N legend
-  doc.rect(sectionStartX + stackedBarLegendSpacing * 3, stackedBarLegendY, 12, 12)
+  // N legend - adjusted to maintain proper spacing after A legend
+  doc.rect(legendStartX + (legendSpacing * 2) + moveAVecesRight, stackedBarLegendY, boxSize, boxSize)
      .fillColor('#FF0000')
      .fill();
   doc.fillColor('black')
-     .text('Casi nunca/Nunca', sectionStartX + stackedBarLegendSpacing * 3 + 16, stackedBarLegendY + 2);
+     .text('Casi nunca/Nunca', legendStartX + (legendSpacing * 2) + moveAVecesRight + textMargin, stackedBarLegendY + 2);
 
-  // Add ESTUDIANTES section
-  doc.moveDown(2);
+  // Add ESTUDIANTES section - Using the legend Y position as a starting point for proper spacing
+  doc.moveDown(3);
+  doc.y = stackedBarLegendY + 30;
   doc.rect(sectionStartX, doc.y, sectionWidth, sectionTitleHeight)
      .fillColor('#1E3A8A')
      .fill();
@@ -584,33 +594,37 @@ export const generateSummaryPage = async (doc: CustomPDFKit, school: string): Pr
   drawStackedBar('Prácticas pedagógicas', estudiantesAvgPracticas, estudiantesBarStartY + barHeight + 10);
   drawStackedBar('Convivencia', estudiantesAvgConvivencia, estudiantesBarStartY + (barHeight + 10) * 2);
 
-  // Add legend for ESTUDIANTES
-  const estudiantesLegendY = estudiantesBarStartY + (barHeight + 10) * 3 + 10;
+  // Add legend for ESTUDIANTES - Moving it directly under the last bar
+  const estudiantesLegendY = estudiantesBarStartY + (barHeight + 10) * 3;
+  
+  // Center the legend horizontally
+  doc.fontSize(8)
+     .fillColor('black');
   
   // S legend
-  doc.rect(sectionStartX, estudiantesLegendY, 12, 12)
+  doc.rect(legendStartX, estudiantesLegendY, boxSize, boxSize)
      .fillColor('#4472C4')
      .fill();
   doc.fillColor('black')
-     .fontSize(8)
-     .text('Siempre/Casi siempre', sectionStartX + 16, estudiantesLegendY + 2);
+     .text('Siempre/Casi siempre', legendStartX + textMargin, estudiantesLegendY + 2);
 
-  // A legend
-  doc.rect(sectionStartX + stackedBarLegendSpacing * 1.5, estudiantesLegendY, 12, 12)
+  // A legend - moved more to the right
+  doc.rect(legendStartX + legendSpacing + moveAVecesRight, estudiantesLegendY, boxSize, boxSize)
      .fillColor('#FFC000')
      .fill();
   doc.fillColor('black')
-     .text('A veces', sectionStartX + stackedBarLegendSpacing * 1.5 + 16, estudiantesLegendY + 2);
+     .text('A veces', legendStartX + legendSpacing + moveAVecesRight + textMargin, estudiantesLegendY + 2);
 
-  // N legend
-  doc.rect(sectionStartX + stackedBarLegendSpacing * 3, estudiantesLegendY, 12, 12)
+  // N legend - adjusted to maintain proper spacing after A legend
+  doc.rect(legendStartX + (legendSpacing * 2) + moveAVecesRight, estudiantesLegendY, boxSize, boxSize)
      .fillColor('#FF0000')
      .fill();
   doc.fillColor('black')
-     .text('Casi nunca/Nunca', sectionStartX + stackedBarLegendSpacing * 3 + 16, estudiantesLegendY + 2);
+     .text('Casi nunca/Nunca', legendStartX + (legendSpacing * 2) + moveAVecesRight + textMargin, estudiantesLegendY + 2);
 
-  // Add ACUDIENTES section
-  doc.moveDown(2);
+  // Add ACUDIENTES section - Using the legend Y position as a starting point for proper spacing
+  doc.moveDown(3);
+  doc.y = estudiantesLegendY + 30;
   doc.rect(sectionStartX, doc.y, sectionWidth, sectionTitleHeight)
      .fillColor('#1E3A8A')
      .fill();
@@ -632,28 +646,68 @@ export const generateSummaryPage = async (doc: CustomPDFKit, school: string): Pr
   drawStackedBar('Prácticas pedagógicas', acudientesAvgPracticas, acudientesBarStartY + barHeight + 10);
   drawStackedBar('Convivencia', acudientesAvgConvivencia, acudientesBarStartY + (barHeight + 10) * 2);
 
-  // Add legend for ACUDIENTES
-  const acudientesLegendY = acudientesBarStartY + (barHeight + 10) * 3 + 10;
+  // Add legend for ACUDIENTES - Moving it directly under the last bar
+  const acudientesLegendY = acudientesBarStartY + (barHeight + 10) * 3;
+  
+  // Center the legend horizontally
+  doc.fontSize(8)
+     .fillColor('black');
   
   // S legend
-  doc.rect(sectionStartX, acudientesLegendY, 12, 12)
+  doc.rect(legendStartX, acudientesLegendY, boxSize, boxSize)
      .fillColor('#4472C4')
      .fill();
   doc.fillColor('black')
-     .fontSize(8)
-     .text('Siempre/Casi siempre', sectionStartX + 16, acudientesLegendY + 2);
+     .text('Siempre/Casi siempre', legendStartX + textMargin, acudientesLegendY + 2);
 
-  // A legend
-  doc.rect(sectionStartX + stackedBarLegendSpacing * 1.5, acudientesLegendY, 12, 12)
+  // A legend - moved more to the right
+  doc.rect(legendStartX + legendSpacing + moveAVecesRight, acudientesLegendY, boxSize, boxSize)
      .fillColor('#FFC000')
      .fill();
   doc.fillColor('black')
-     .text('A veces', sectionStartX + stackedBarLegendSpacing * 1.5 + 16, acudientesLegendY + 2);
+     .text('A veces', legendStartX + legendSpacing + moveAVecesRight + textMargin, acudientesLegendY + 2);
 
-  // N legend
-  doc.rect(sectionStartX + stackedBarLegendSpacing * 3, acudientesLegendY, 12, 12)
+  // N legend - adjusted to maintain proper spacing after A legend
+  doc.rect(legendStartX + (legendSpacing * 2) + moveAVecesRight, acudientesLegendY, boxSize, boxSize)
      .fillColor('#FF0000')
      .fill();
   doc.fillColor('black')
-     .text('Casi nunca/Nunca', sectionStartX + stackedBarLegendSpacing * 3 + 16, acudientesLegendY + 2);
+     .text('Casi nunca/Nunca', legendStartX + (legendSpacing * 2) + moveAVecesRight + textMargin, acudientesLegendY + 2);
+     
+  // Add instruction box with instruction at the end
+  doc.moveDown(4);
+  const instructionBoxX = 40;
+  const instructionBoxY = doc.y;
+  const instructionBoxWidth = doc.page.width - (instructionBoxX * 2);
+  const instructionBoxHeight = 40; // Height for 2 lines of text
+  
+  // Draw exclamation mark icon (red)
+  doc.save();
+  const iconX = instructionBoxX - 15;
+  const iconY = instructionBoxY + (instructionBoxHeight / 2) - 18; // Adjusted for smaller box
+  
+  doc.font('Helvetica-Bold')
+     .fontSize(36)
+     .fillColor('#FF0000') // Red exclamation mark
+     .text('!', iconX, iconY);
+     
+  // Draw box for text
+  doc.rect(instructionBoxX, instructionBoxY, instructionBoxWidth, instructionBoxHeight)
+     .lineWidth(1)
+     .stroke();
+  
+  // Add instruction text in red, centered vertically by approximation
+  doc.fontSize(10)
+     .font('Helvetica')
+     .fillColor('#FF0000') // Red text
+     .text('Lo ideal sería que, en los tres componentes, la percepción de cada uno de los actores fuera lo más positiva posible. Identifique en cuáles actores y componentes la percepción negativa es mayor.', 
+           instructionBoxX + 10, 
+           instructionBoxY + 12, // Approximately vertically centered (40px height / 2 = 20px, minus half text height ~8px)
+           {
+             width: instructionBoxWidth - 20,
+             align: 'center',
+             lineGap: 0 // Reduce line spacing
+           });
+  
+  doc.restore();
 }; 
