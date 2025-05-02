@@ -19,18 +19,18 @@ Section 4 (Page 4): ENCUESTADOS
     There is no color scheme or specific color
     There is no charting library preference 
         DOCENTES 
-            Values are coming from docentes_form_submissions table):  This section will show the number of records found for the linked school and some charts (xx encuestados).  Next we will see charts (add a legend) to the charts):
+            Values are coming from docentes_form_submissions table:  This section will show the number of records found for the linked school and some charts (xx encuestados).  Next we will see charts (add a legend) to the charts:
                 "En que grados tiene clases?" (Donut chart ) showing the percentage.
                 "En que jordan tiene clases?" (Donut chart) showing the percentage.
                 "Cuantos anos lleva en la IE?" (bar chart): x value from anos_como_docente. Show the count of unique values
                 "Usted recibe retroalimentacion de" (bar chart)
         ESTUDIANTES
-            Values are coming from estudiantes_form_submissions table):  This section will show the number of records found for the linked school and some charts (xx encuestados).  Next we will see charts (add a legend) to the charts):
+            Values are coming from estudiantes_form_submissions table:  This section will show the number of records found for the linked school and some charts (xx encuestados).  Next we will see charts (add a legend) to the charts:
                 "En que grados te encuentras?" (Donut chart ) showing the percentage.
                 "En que jordana tienes clase?" (Donut chart) showing the percentage.
                 "Cuantos anos llevas en el colegio?" (bar chart): x values from anos_estudiando
     ACUDIENTES (This section is a table with one row)
-            Values are coming from acudientes_form_submissions table):  This section will show the number of records found for the linked school and some charts (xx encuestados).  Next we will see table:
+            Values are coming from acudientes_form_submissions table:  This section will show the number of records found for the linked school and some charts (xx encuestados).  Next we will see table:
                 "en que grado se encuentran los estudiantes que representa?" (table )
 
     For the bar chart showing years, show only the unique values.

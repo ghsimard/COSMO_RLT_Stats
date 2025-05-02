@@ -42,4 +42,4 @@ export async function getTableColumns(tableName: string): Promise<string[]> {
     console.error(`Error getting columns for table ${tableName}:`, error);
     throw error;
   }
-} 
+}

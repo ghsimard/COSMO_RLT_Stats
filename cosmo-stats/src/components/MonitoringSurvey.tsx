@@ -25,6 +25,8 @@ import ContactPhoneIcon from '@mui/icons-material/ContactPhone';
 import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
+
 interface SchoolMonitoringData {
   schoolName: string;
   rectorName: string;
@@ -136,7 +138,7 @@ export const MonitoringSurvey: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('http://localhost:4001/api/monitoring');
+        const response = await fetch(`${API_BASE_URL}/api/monitoring`);
         if (!response.ok) throw new Error('Error al cargar los datos');
         const data = await response.json();
         console.log('API Response:', data);

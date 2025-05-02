@@ -9,7 +9,13 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Box
+  Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
+  Button
 } from '@mui/material';
 import { getFrequencyRatings } from '../services/databaseService';
 import { FrequencyData } from '../types';
@@ -20,11 +26,32 @@ export const FrequencyChart: React.FC = () => {
   const [data, setData] = useState<FrequencyData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [schools, setSchools] = useState<string[]>([]);
+  const [selectedSchool, setSelectedSchool] = useState<string>('');
 
+  // Fetch available schools
+  useEffect(() => {
+    const fetchSchools = async () => {
+      try {
+        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/monitoring`);
+        if (!response.ok) throw new Error('Error al cargar las escuelas');
+        const data = await response.json();
+        const schoolNames = data.map((school: any) => school.schoolName);
+        setSchools(schoolNames);
+      } catch (err) {
+        console.error('Error fetching schools:', err);
+      }
+    };
+
+    fetchSchools();
+  }, []);
+
+  // Fetch frequency data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const frequencyData = await getFrequencyRatings();
+        setLoading(true);
+        const frequencyData = await getFrequencyRatings(selectedSchool);
         console.log('Received data:', frequencyData);
         setData(frequencyData);
         setLoading(false);
@@ -36,7 +63,40 @@ export const FrequencyChart: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedSchool]);
+
+  const handleSchoolChange = (event: SelectChangeEvent) => {
+    setSelectedSchool(event.target.value);
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/generate-pdf${selectedSchool ? `?school=${encodeURIComponent(selectedSchool)}` : ''}`);
+      if (!response.ok) throw new Error('Error generating PDF');
+      
+      // Create a blob from the response
+      const blob = await response.blob();
+      
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `frequency-report${selectedSchool ? `-${selectedSchool}` : ''}.pdf`;
+      
+      // Append the link to the document, click it, and remove it
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the URL
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading PDF:', err);
+      setError('Error downloading PDF');
+    }
+  };
 
   if (loading) {
     return (
@@ -104,9 +164,35 @@ export const FrequencyChart: React.FC = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom align="center">
-        Distribución de Frecuencias
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Distribución de Frecuencias
+        </Typography>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={handleDownloadPDF}
+          disabled={loading}
+        >
+          Download PDF
+        </Button>
+      </Box>
+      <FormControl fullWidth>
+        <InputLabel id="school-label">Escuela</InputLabel>
+        <Select
+          labelId="school-label"
+          id="school"
+          value={selectedSchool}
+          label="Escuela"
+          onChange={handleSchoolChange}
+        >
+          {schools.map((school) => (
+            <MenuItem key={school} value={school}>
+              {school}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
       {data?.map((section, sectionIndex) => (
         <Box key={sectionIndex} sx={{ mb: 4 }}>
           <Typography variant="h5" component="h2" gutterBottom sx={{ mt: 4, mb: 2 }}>

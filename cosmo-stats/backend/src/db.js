@@ -50,8 +50,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.pool = void 0;
 exports.getTableColumns = getTableColumns;
 var pg_1 = require("pg");
-var dotenv_1 = require("dotenv");
-dotenv_1.default.config();
+require('dotenv').config();
 var dbConfig = {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432'),
