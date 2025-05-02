@@ -131,11 +131,40 @@ export const generateCoverPage = async (doc: CustomPDFKit, school?: string): Pro
   if (school) {
     // Calculate text dimensions and position for background
     const schoolText = school.toUpperCase();
-    const fontSize = 16;
+    
+    // Calculate dynamic font size based on text length
+    // Start with base font size of 16 and scale down for longer names
+    const maxWidth = pageWidth - 120; // Maximum width available for the text box
+    let fontSize = 16; // Default font size
+    
+    // Calculate font size based on text length
+    if (schoolText.length > 50) {
+      fontSize = 10; // Very long names (50+ chars)
+    } else if (schoolText.length > 40) {
+      fontSize = 12; // Long names (40-50 chars)
+    } else if (schoolText.length > 30) {
+      fontSize = 14; // Medium-long names (30-40 chars)
+    }
+    
+    // Set the font size and get the resulting width
+    doc.fontSize(fontSize);
     const textWidth = doc.widthOfString(schoolText);
+    
+    // Further adjust if the width exceeds maximum
+    if (textWidth > maxWidth) {
+      // Recalculate font size based on available width
+      fontSize = Math.floor(fontSize * (maxWidth / textWidth));
+      doc.fontSize(fontSize);
+      // Recompute text width with new font size
+      const adjustedTextWidth = doc.widthOfString(schoolText);
+      console.log(`School name "${school}" resized to fontSize ${fontSize}, width: ${adjustedTextWidth}`);
+    }
+    
+    // Final measurement with potentially adjusted font size
+    const finalTextWidth = doc.widthOfString(schoolText);
     const padding = 20;  // Padding around text
-    const rectWidth = textWidth + (padding * 2);
-    const rectHeight = fontSize + (padding * 0.8);  // Slightly less vertical padding
+    const rectWidth = finalTextWidth + (padding * 2);
+    const rectHeight = fontSize + (padding * 1.2);  // Slightly increased vertical padding
     const rectX = (pageWidth - rectWidth) / 2;  // Center the rectangle
     const currentY = doc.y;
 
@@ -147,14 +176,13 @@ export const generateCoverPage = async (doc: CustomPDFKit, school?: string): Pro
        .restore();  // Restore graphics state
 
     // Add school name text
-    doc.fontSize(fontSize)
-       .font('Helvetica')
+    doc.font('Helvetica')
        .fillColor('white')  // White text
        .text(schoolText, {
          align: 'center'
        })
        .fillColor('black')  // Reset to black for subsequent text
-       .moveDown(1);
+       .moveDown(3);  // Increased space from 1 to 3 before ENTIDAD TERRITORIAL
 
     // Add ENTIDAD TERRITORIAL below school name
     const entidadText = await getEntidadTerritorial(school);
