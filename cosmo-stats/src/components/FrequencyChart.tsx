@@ -21,6 +21,7 @@ import { getFrequencyRatings } from '../services/databaseService';
 import { FrequencyData } from '../types';
 import Spinner from './Spinner';
 import './FrequencyChart.css';
+import DownloadIcon from '@mui/icons-material/Download';
 
 export const FrequencyChart: React.FC = () => {
   const [data, setData] = useState<FrequencyData[]>([]);
@@ -125,6 +126,66 @@ export const FrequencyChart: React.FC = () => {
     }
   };
 
+  // Add a function to handle generating all PDFs
+  const handleGenerateAllPDFs = async () => {
+    try {
+      setLoading(true);
+      console.log('Starting all PDFs generation process');
+      const apiUrl = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/generate-all-pdfs`;
+      console.log('API URL:', apiUrl);
+      
+      console.log('Sending fetch request...');
+      const response = await fetch(apiUrl);
+      console.log('Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Array.from(response.headers).reduce((obj, [key, value]) => {
+          obj[key] = value;
+          return obj;
+        }, {} as Record<string, string>),
+        ok: response.ok
+      });
+      
+      if (!response.ok) throw new Error(`Error generating PDFs: ${response.status} ${response.statusText}`);
+      
+      // Create a blob from the response
+      console.log('Creating blob from response...');
+      const blob = await response.blob();
+      console.log('Blob created:', {
+        size: blob.size,
+        type: blob.type
+      });
+      
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      console.log('URL created:', url);
+      
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'all-frequency-reports.zip';
+      console.log('Link created with attributes:', {
+        href: link.href,
+        download: link.download
+      });
+      
+      // Append the link to the document, click it, and remove it
+      console.log('Triggering download...');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the URL
+      window.URL.revokeObjectURL(url);
+      console.log('Download process completed');
+      setLoading(false);
+    } catch (err) {
+      console.error('Error downloading all PDFs:', err);
+      setError('Error al generar todos los PDFs');
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -195,14 +256,26 @@ export const FrequencyChart: React.FC = () => {
         <Typography variant="h4" component="h1" gutterBottom>
           Distribución de Frecuencias
         </Typography>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={handleDownloadPDF}
-          disabled={loading}
-        >
-          Download PDF
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={handleDownloadPDF}
+            disabled={loading}
+            startIcon={<DownloadIcon />}
+          >
+            Descargar PDF
+          </Button>
+          <Button 
+            variant="contained" 
+            color="secondary" 
+            onClick={handleGenerateAllPDFs}
+            disabled={loading}
+            startIcon={<DownloadIcon />}
+          >
+            Generar todos los PDFs
+          </Button>
+        </Box>
       </Box>
       <FormControl fullWidth>
         <InputLabel id="school-label">Escuela</InputLabel>

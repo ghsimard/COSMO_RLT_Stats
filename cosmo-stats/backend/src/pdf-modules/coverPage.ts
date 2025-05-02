@@ -1,0 +1,171 @@
+import path from 'path';
+import { pool } from '../db';
+import { CustomPDFKit } from './pdfUtils';
+
+// Function to get entidad_territorial
+async function getEntidadTerritorial(school: string): Promise<string> {
+  try {
+    const query = `
+      SELECT entidad_territorial 
+      FROM rectores 
+      WHERE nombre_de_la_institucion_educativa_en_la_actualmente_desempena_ = $1 
+      LIMIT 1
+    `;
+    const result = await pool.query(query, [school]);
+    return result.rows[0]?.entidad_territorial || 'No especificada';
+  } catch (error) {
+    console.error('Error fetching entidad_territorial:', error);
+    return 'No especificada';
+  }
+}
+
+// Function to create cover page (first page)
+export const generateCoverPage = async (doc: CustomPDFKit, school?: string): Promise<void> => {
+  // Create the first page
+  doc.addPage();
+  
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  
+  // Add logos at top
+  const logoHeight = 100;   // Height for logos
+  const logoWidth = 180;    // Width for logos
+  const logoY = 50;         // Y position for logos
+  const sideMargin = 40;    // Margin for both sides
+  
+  try {
+    // Construct absolute paths to image files
+    const rltLogoPath = path.join(__dirname, '..', '..', '..', 'public', 'images', 'RLT_logo.jpeg');
+    const cltLogoPath = path.join(__dirname, '..', '..', '..', 'public', 'images', 'CLT_logo.jpeg');
+    
+    console.log('Attempting to load images from:');
+    console.log('RLT logo path:', rltLogoPath);
+    console.log('CLT logo path:', cltLogoPath);
+    
+    // Add RLT logo on the far left
+    try {
+      doc.image(
+        rltLogoPath,
+        sideMargin,  // X position at left margin
+        logoY,
+        {
+          fit: [logoWidth, logoHeight]  // Width and height constraints
+        }
+      );
+      console.log('RLT logo added successfully');
+    } catch (logoError) {
+      console.error('Error loading RLT logo:', logoError);
+      // Draw a placeholder rectangle instead
+      doc.rect(sideMargin, logoY, logoWidth, logoHeight)
+         .stroke()
+         .fontSize(12)
+         .text('RLT Logo', sideMargin + 10, logoY + 40, { width: logoWidth - 20, align: 'center' });
+      console.log('Added RLT logo placeholder rectangle');
+    }
+
+    // Add CLT logo on the far right
+    try {
+      doc.image(
+        cltLogoPath,
+        pageWidth - logoWidth + sideMargin/2,  // Extend into the margin area
+        logoY,
+        {
+          fit: [logoWidth, logoHeight]  // Width and height constraints
+        }
+      );
+      console.log('CLT logo added successfully');
+    } catch (logoError) {
+      console.error('Error loading CLT logo:', logoError);
+      // Draw a placeholder rectangle instead
+      doc.rect(pageWidth - logoWidth + sideMargin/2, logoY, logoWidth, logoHeight)
+         .stroke()
+         .fontSize(12)
+         .text('CLT Logo', pageWidth - logoWidth + sideMargin/2 + 10, logoY + 40, { width: logoWidth - 20, align: 'center' });
+      console.log('Added CLT logo placeholder rectangle');
+    }
+  } catch (error) {
+    console.error('Error in logo section:', error);
+    // Continue without logos if the whole section fails
+  }
+
+  doc.moveDown(8);  // Space after logos
+
+  // Program titles in the middle
+  doc.fontSize(16)
+     .font('Helvetica-Bold')
+     .text('PROGRAMA', {
+       align: 'center'
+     })
+     .moveDown(0.5);  // Reduced spacing
+
+  doc.text('RECTORES LÍDERES TRANSFORMADORES', {
+       align: 'center'
+     })
+     .moveDown(0.5);  // Reduced spacing
+
+  doc.text('COORDINADORES LÍDERES TRANSFORMADORES', {
+       align: 'center'
+     })
+     .moveDown(8);  // Space before survey title
+
+  // Survey title
+  doc.fontSize(36)
+     .font('Helvetica')
+     .text('Encuesta de', {
+       align: 'center'
+     })
+     .text('Ambiente Escolar', {
+       align: 'center'
+     })
+     .moveDown(2);  // Space before results text
+
+  // Results text at bottom
+  doc.fontSize(20)
+     .font('Helvetica-Bold')
+     .text('INFORME DE RESULTADOS', {
+       align: 'center'
+     })
+     .moveDown(1);  // Space before school name
+
+  // Add school name if provided
+  if (school) {
+    // Calculate text dimensions and position for background
+    const schoolText = school.toUpperCase();
+    const fontSize = 16;
+    const textWidth = doc.widthOfString(schoolText);
+    const padding = 20;  // Padding around text
+    const rectWidth = textWidth + (padding * 2);
+    const rectHeight = fontSize + (padding * 0.8);  // Slightly less vertical padding
+    const rectX = (pageWidth - rectWidth) / 2;  // Center the rectangle
+    const currentY = doc.y;
+
+    // Draw background rectangle for school name
+    doc.save()  // Save graphics state
+       .fillColor('#2C5282')  // Dark blue background
+       .rect(rectX, currentY - padding/2, rectWidth, rectHeight)
+       .fill()
+       .restore();  // Restore graphics state
+
+    // Add school name text
+    doc.fontSize(fontSize)
+       .font('Helvetica')
+       .fillColor('white')  // White text
+       .text(schoolText, {
+         align: 'center'
+       })
+       .fillColor('black')  // Reset to black for subsequent text
+       .moveDown(1);
+
+    // Add ENTIDAD TERRITORIAL below school name
+    const entidadText = await getEntidadTerritorial(school);
+    const labelWidth = doc.widthOfString('ENTIDAD TERRITORIAL: ');
+    const totalWidth = doc.widthOfString(`ENTIDAD TERRITORIAL: ${entidadText}`);
+    const startX = (pageWidth - totalWidth) / 2;
+    
+    doc.fontSize(14)
+       .font('Helvetica-Bold')
+       .text('ENTIDAD TERRITORIAL:     ', startX, doc.y, { continued: true })
+       .font('Helvetica')
+       .text(entidadText);
+  }
+}; 
