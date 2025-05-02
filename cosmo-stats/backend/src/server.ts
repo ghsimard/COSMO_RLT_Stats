@@ -575,28 +575,58 @@ app.get('/api/generate-pdf', async (req, res) => {
       const sideMargin = 40;    // Margin for both sides
       
       try {
+        // Construct absolute paths to image files
+        const rltLogoPath = path.join(__dirname, '..', '..', 'public', 'images', 'RLT_logo.jpeg');
+        const cltLogoPath = path.join(__dirname, '..', '..', 'public', 'images', 'CLT_logo.jpeg');
+        
+        console.log('Attempting to load images from:');
+        console.log('RLT logo path:', rltLogoPath);
+        console.log('CLT logo path:', cltLogoPath);
+        
         // Add RLT logo on the far left
-        doc.image(
-          path.join(__dirname, '..', '..', 'public', 'images', 'RLT_logo.jpeg'),
-          sideMargin,  // X position at left margin
-          logoY,
-          {
-            fit: [logoWidth, logoHeight]  // Width and height constraints
-          }
-        );
+        try {
+          doc.image(
+            rltLogoPath,
+            sideMargin,  // X position at left margin
+            logoY,
+            {
+              fit: [logoWidth, logoHeight]  // Width and height constraints
+            }
+          );
+          console.log('RLT logo added successfully');
+        } catch (logoError) {
+          console.error('Error loading RLT logo:', logoError);
+          // Draw a placeholder rectangle instead
+          doc.rect(sideMargin, logoY, logoWidth, logoHeight)
+             .stroke()
+             .fontSize(12)
+             .text('RLT Logo', sideMargin + 10, logoY + 40, { width: logoWidth - 20, align: 'center' });
+          console.log('Added RLT logo placeholder rectangle');
+        }
 
         // Add CLT logo on the far right
-        doc.image(
-          path.join(__dirname, '..', '..', 'public', 'images', 'CLT_logo.jpeg'),
-          pageWidth - logoWidth + sideMargin/2,  // Extend into the margin area
-          logoY,
-          {
-            fit: [logoWidth, logoHeight]  // Width and height constraints
-          }
-        );
+        try {
+          doc.image(
+            cltLogoPath,
+            pageWidth - logoWidth + sideMargin/2,  // Extend into the margin area
+            logoY,
+            {
+              fit: [logoWidth, logoHeight]  // Width and height constraints
+            }
+          );
+          console.log('CLT logo added successfully');
+        } catch (logoError) {
+          console.error('Error loading CLT logo:', logoError);
+          // Draw a placeholder rectangle instead
+          doc.rect(pageWidth - logoWidth + sideMargin/2, logoY, logoWidth, logoHeight)
+             .stroke()
+             .fontSize(12)
+             .text('CLT Logo', pageWidth - logoWidth + sideMargin/2 + 10, logoY + 40, { width: logoWidth - 20, align: 'center' });
+          console.log('Added CLT logo placeholder rectangle');
+        }
       } catch (error) {
-        console.error('Error loading logos:', error);
-        // Continue without logos if they fail to load
+        console.error('Error in logo section:', error);
+        // Continue without logos if the whole section fails
       }
 
       doc.moveDown(8);  // Space after logos

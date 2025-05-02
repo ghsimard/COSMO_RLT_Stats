@@ -71,27 +71,54 @@ export const FrequencyChart: React.FC = () => {
 
   const handleDownloadPDF = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/generate-pdf${selectedSchool ? `?school=${encodeURIComponent(selectedSchool)}` : ''}`);
-      if (!response.ok) throw new Error('Error generating PDF');
+      console.log('Starting PDF download process');
+      const apiUrl = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/generate-pdf${selectedSchool ? `?school=${encodeURIComponent(selectedSchool)}` : ''}`;
+      console.log('API URL:', apiUrl);
+      
+      console.log('Sending fetch request...');
+      const response = await fetch(apiUrl);
+      console.log('Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Array.from(response.headers).reduce((obj, [key, value]) => {
+          obj[key] = value;
+          return obj;
+        }, {} as Record<string, string>),
+        ok: response.ok
+      });
+      
+      if (!response.ok) throw new Error(`Error generating PDF: ${response.status} ${response.statusText}`);
       
       // Create a blob from the response
+      console.log('Creating blob from response...');
       const blob = await response.blob();
+      console.log('Blob created:', {
+        size: blob.size,
+        type: blob.type
+      });
       
       // Create a URL for the blob
       const url = window.URL.createObjectURL(blob);
+      console.log('URL created:', url);
       
       // Create a temporary link element
       const link = document.createElement('a');
       link.href = url;
       link.download = `frequency-report${selectedSchool ? `-${selectedSchool}` : ''}.pdf`;
+      console.log('Link created with attributes:', {
+        href: link.href,
+        download: link.download
+      });
       
       // Append the link to the document, click it, and remove it
+      console.log('Triggering download...');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
       // Clean up the URL
       window.URL.revokeObjectURL(url);
+      console.log('Download process completed');
     } catch (err) {
       console.error('Error downloading PDF:', err);
       setError('Error downloading PDF');
