@@ -187,14 +187,16 @@ export const generateCoverPage = async (doc: CustomPDFKit, school?: string): Pro
     // Add ENTIDAD TERRITORIAL below school name
     const entidadText = await getEntidadTerritorial(school);
     
-    // Center align the entire text
+    // First display the label centered
     doc.fontSize(14)
        .font('Helvetica-Bold')
-       .text('ENTIDAD TERRITORIAL: ', {
-         align: 'center',
-         continued: true
+       .text('ENTIDAD TERRITORIAL:', {
+         align: 'center'
        })
-       .font('Helvetica')
+       .moveDown(0.5);  // Add some space between label and value
+    
+    // Then display the value centered on the next line
+    doc.font('Helvetica')
        .text(entidadText, {
          align: 'center'
        });
