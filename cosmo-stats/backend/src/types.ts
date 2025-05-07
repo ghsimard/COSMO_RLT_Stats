@@ -43,5 +43,11 @@ export interface SectionConfig {
   }[];
 }
 
+export interface PieChartData {
+  label: string;
+  value: number;
+  color: string;
+}
+
 export type GroupName = 'docentes' | 'estudiantes' | 'acudientes';
 export type SectionName = 'comunicacion' | 'practicas_pedagogicas' | 'convivencia'; 

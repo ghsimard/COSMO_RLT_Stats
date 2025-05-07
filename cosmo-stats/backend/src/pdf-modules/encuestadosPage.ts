@@ -1,5 +1,6 @@
-import { CustomPDFKit, addHeader, PieChartData, drawPieChart, drawBarChart, BarChartData } from './pdfUtils';
+import { CustomPDFKit, addHeader, PieChartData, drawPieChart as drawPieChartUtil, drawBarChart, BarChartData } from './pdfUtils';
 import { pool } from '../db';
+import PDFDocument from 'pdfkit';
 
 // Helper function to get docentes count
 async function getDocentesCount(school: string): Promise<number> {
@@ -7,12 +8,12 @@ async function getDocentesCount(school: string): Promise<number> {
     const query = `
       SELECT COUNT(*) as count
       FROM docentes_form_submissions
-      WHERE institucion_educativa = $1
+      WHERE institucion_educativa = $1;
     `;
     const result = await pool.query(query, [school]);
-    return parseInt(result.rows[0]?.count) || 0;
+    return parseInt(result.rows[0].count);
   } catch (error) {
-    console.error('Error fetching docentes count:', error);
+    console.error('Error getting docentes count:', error);
     return 0;
   }
 }
@@ -52,16 +53,22 @@ async function getAcudientesCount(school: string): Promise<number> {
 // Helper function to get grades distribution for docentes
 async function getGradesDistribution(school: string): Promise<PieChartData[]> {
   try {
-    // First, let's log a sample of the raw data
-    const sampleQuery = `
-      SELECT grados_asignados, institucion_educativa 
-      FROM docentes_form_submissions 
-      WHERE institucion_educativa = $1
-      LIMIT 5;
+    console.log('getGradesDistribution called with school:', school);
+    
+    // First, verify the school exists
+    const verifyQuery = `
+      SELECT COUNT(*) as count
+      FROM docentes_form_submissions
+      WHERE institucion_educativa = $1;
     `;
     
-    const sampleResult = await pool.query(sampleQuery, [school]);
-    console.log('Sample data:', JSON.stringify(sampleResult.rows, null, 2));
+    const verifyResult = await pool.query(verifyQuery, [school]);
+    console.log('School verification result:', verifyResult.rows[0]);
+    
+    if (verifyResult.rows[0].count === 0) {
+      console.log('No data found for school:', school);
+      throw new Error(`No data found for school: ${school}`);
+    }
 
     const query = `
       WITH RECURSIVE 
@@ -71,17 +78,17 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
       grade_data AS (
         SELECT 
           d.institucion_educativa,
-          unnest(d.grados_asignados) as grade
+          TRIM(REGEXP_REPLACE(REGEXP_REPLACE(unnest(d.grados_asignados), '[°|º]', '', 'g'), '\\s+', '', 'g')) as clean_grade
         FROM docentes_form_submissions d
         WHERE d.institucion_educativa = $1
       ),
       grade_counts AS (
         SELECT
           CASE 
-            WHEN grade = 'Preescolar' OR grade = 'Primera infancia' THEN 'Preescolar'
-            WHEN grade IN ('1', '2', '3', '4', '5') THEN 'Primaria'
-            WHEN grade IN ('6', '7', '8', '9') THEN 'Secundaria'
-            WHEN grade IN ('10', '11', '12') THEN 'Media'
+            WHEN clean_grade ILIKE ANY(ARRAY['preescolar', 'primerainfancia', 'primera infancia']) THEN 'Preescolar'
+            WHEN clean_grade ~ '^[1-5]$' THEN 'Primaria'
+            WHEN clean_grade ~ '^[6-9]$' THEN 'Secundaria'
+            WHEN clean_grade ~ '^1[0-1]$' THEN 'Media'
             ELSE 'Otros'
           END as category,
           COUNT(*) as count
@@ -103,11 +110,11 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
         END;
     `;
 
-    console.log('Executing query with school:', school);
+    console.log('Executing grades distribution query...');
     const result = await pool.query(query, [school]);
-    console.log('Query results:', JSON.stringify(result.rows, null, 2));
+    console.log('Raw grades distribution result:', result.rows);
 
-    // Define colors and labels with a new color scheme
+    // Define colors for each category
     const categoryConfig: { [key: string]: { color: string, label: string } } = {
       'Preescolar': { color: '#FF9F40', label: 'Preescolar' },  // Warm Orange
       'Primaria': { color: '#4B89DC', label: 'Primaria' },      // Royal Blue
@@ -115,25 +122,34 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
       'Media': { color: '#967ADC', label: 'Media' }             // Purple
     };
 
-    // Transform the data
-    const chartData = result.rows.map(row => ({
-      label: categoryConfig[row.category].label,  // Removed percentage from label
-      value: row.count,
-      color: categoryConfig[row.category].color
-    }));
+    const total = result.rows.reduce((sum, row) => sum + row.count, 0);
+    console.log('Total count:', total);
 
-    // Log the final chart data
-    console.log('Final chart data:', JSON.stringify(chartData, null, 2));
+    if (total === 0) {
+      console.log('No grades data found for school:', school);
+      return [
+        { label: 'No hay datos', value: 1, color: '#CCCCCC' }
+      ];
+    }
 
+    // Transform the data and calculate percentages
+    const chartData = result.rows.map(row => {
+      const percentage = ((row.count / total) * 100).toFixed(1);
+      console.log(`Processing category ${row.category}: count=${row.count}, percentage=${percentage}%`);
+      return {
+        label: `${categoryConfig[row.category].label} (${percentage}%)`,
+        value: row.count,
+        color: categoryConfig[row.category].color
+      };
+    });
+
+    console.log('Final chart data:', chartData);
     return chartData;
   } catch (error) {
     console.error('Error in getGradesDistribution:', error);
-    // Return default data in case of error
+    // Return a single "Error" segment instead of empty data
     return [
-      { label: 'Preescolar', value: 0, color: '#FF9F40' },
-      { label: 'Primaria', value: 0, color: '#4B89DC' },
-      { label: 'Secundaria', value: 0, color: '#37BC9B' },
-      { label: 'Media', value: 0, color: '#967ADC' }
+      { label: 'Error al cargar datos', value: 1, color: '#FF0000' }
     ];
   }
 }
@@ -444,6 +460,357 @@ async function getGradosEstudiantesDistribution(school: string): Promise<PieChar
   }
 }
 
+// Add new function to get years distribution
+async function getYearsDistribution(school: string): Promise<BarChartData[]> {
+  try {
+    console.log('Fetching years distribution for school:', school);
+    
+    const query = `
+      SELECT 
+        anos_como_docente as year_range,
+        COUNT(*) as count
+      FROM docentes_form_submissions
+      WHERE institucion_educativa = $1
+      GROUP BY anos_como_docente
+      ORDER BY 
+        CASE anos_como_docente
+          WHEN 'Menos de 1' THEN 1
+          WHEN '1' THEN 2
+          WHEN '2' THEN 3
+          WHEN '3' THEN 4
+          WHEN '4' THEN 5
+          WHEN '5' THEN 6
+          WHEN 'Más de 5' THEN 7
+          ELSE 8
+        END;
+    `;
+
+    // Log the raw query
+    console.log('Executing query:', query.replace(/\s+/g, ' '));
+    console.log('With school parameter:', school);
+
+    const result = await pool.query(query, [school]);
+    console.log('Years distribution raw data:', result.rows);
+
+    // Define the mapping from database values to display labels
+    const labelMapping: Record<string, string> = {
+      'Menos de 1': 'Menos de 1',
+      '1': '1 año',
+      '2': '2 años',
+      '3': '3 años',
+      '4': '4 años',
+      '5': '5 años',
+      'Más de 5': '6 o mas'
+    };
+
+    type YearRange = 'Menos de 1' | '1' | '2' | '3' | '4' | '5' | 'Más de 5';
+    type DisplayLabel = 'Menos de 1' | '1 año' | '2 años' | '3 años' | '4 años' | '5 años' | '6 o mas';
+    
+    const colors: Record<YearRange, string> = {
+      'Menos de 1': '#4472C4',  // Blue
+      '1': '#ED7D31',          // Orange
+      '2': '#A5A5A5',          // Gray
+      '3': '#FFC000',          // Yellow
+      '4': '#5B9BD5',          // Light Blue
+      '5': '#70AD47',          // Green
+      'Más de 5': '#7030A0'    // Purple
+    };
+
+    // Transform the data with display labels
+    const chartData = result.rows.map(row => {
+      console.log('Processing row:', row);
+      const dbValue = row.year_range as YearRange;
+      return {
+        label: labelMapping[dbValue] || dbValue,
+        value: parseInt(row.count),
+        color: colors[dbValue] || '#000000'
+      };
+    });
+
+    console.log('Final chart data:', chartData);
+
+    // If no data, return default structure with display labels
+    if (chartData.length === 0) {
+      console.log('No data found, returning default structure');
+      return [
+        { label: 'Menos de 1', value: 0, color: '#4472C4' },
+        { label: '1 año', value: 0, color: '#ED7D31' },
+        { label: '2 años', value: 0, color: '#A5A5A5' },
+        { label: '3 años', value: 0, color: '#FFC000' },
+        { label: '4 años', value: 0, color: '#5B9BD5' },
+        { label: '5 años', value: 0, color: '#70AD47' },
+        { label: '6 o mas', value: 0, color: '#7030A0' }
+      ];
+    }
+
+    // Ensure all categories are present with display labels
+    const dbCategories: YearRange[] = ['Menos de 1', '1', '2', '3', '4', '5', 'Más de 5'];
+    const existingCategories = new Set(chartData.map(d => d.label));
+    
+    // Add missing categories with value 0
+    dbCategories.forEach(dbValue => {
+      const displayLabel = labelMapping[dbValue];
+      if (!existingCategories.has(displayLabel)) {
+        chartData.push({
+          label: displayLabel,
+          value: 0,
+          color: colors[dbValue]
+        });
+      }
+    });
+
+    // Sort the data using database values
+    chartData.sort((a, b) => {
+      const order: Record<DisplayLabel, number> = {
+        'Menos de 1': 1,
+        '1 año': 2,
+        '2 años': 3,
+        '3 años': 4,
+        '4 años': 5,
+        '5 años': 6,
+        '6 o mas': 7
+      };
+      return order[a.label as DisplayLabel] - order[b.label as DisplayLabel];
+    });
+
+    return chartData;
+  } catch (error) {
+    console.error('Error fetching years distribution:', error);
+    return [
+      { label: 'Menos de 1', value: 0, color: '#4472C4' },
+      { label: '1 año', value: 0, color: '#ED7D31' },
+      { label: '2 años', value: 0, color: '#A5A5A5' },
+      { label: '3 años', value: 0, color: '#FFC000' },
+      { label: '4 años', value: 0, color: '#5B9BD5' },
+      { label: '5 años', value: 0, color: '#70AD47' },
+      { label: '6 o mas', value: 0, color: '#7030A0' }
+    ];
+  }
+}
+
+// Get feedback distribution from database
+async function getFeedbackDistribution(school: string): Promise<BarChartData[]> {
+  try {
+    console.log('Fetching feedback distribution for school:', school);
+    
+    // First, let's check what data we have and its format
+    const checkQuery = `
+      SELECT 
+        institucion_educativa,
+        retroalimentacion_de,
+        array_length(retroalimentacion_de, 1) as array_length
+      FROM docentes_form_submissions
+      WHERE institucion_educativa = $1;
+    `;
+    const checkResult = await pool.query(checkQuery, [school]);
+    console.log('Raw data check:', checkResult.rows);
+
+    // Now get the distribution with proper array handling
+    const query = `
+      WITH feedback_data AS (
+        SELECT 
+          CASE 
+            WHEN retroalimentacion_de IS NULL OR retroalimentacion_de = '{}' THEN ARRAY['Ninguno']
+            ELSE retroalimentacion_de
+          END as feedback
+        FROM docentes_form_submissions
+        WHERE institucion_educativa = $1
+      ),
+      unnested_data AS (
+        SELECT unnest(feedback) as source
+        FROM feedback_data
+      )
+      SELECT 
+        source,
+        COUNT(*) as count
+      FROM unnested_data
+      GROUP BY source
+      ORDER BY source;
+    `;
+
+    console.log('Executing distribution query:', query);
+    const { rows } = await pool.query(query, [school]);
+    console.log('Distribution query results:', rows);
+    
+    // Define mapping from database values to display labels
+    const labelMapping: Record<string, string> = {
+      'Rector/a': 'Rector',
+      'Coordinador/a': 'Coordinator',
+      'Otros/as docentes': 'Otros docentes',
+      'Acudientes': 'Acudientes',
+      'Estudiantes': 'Estudiantes',
+      'Otros': 'Otros',
+      'Ninguno': 'Ninguno'
+    };
+
+    // Initialize with default structure and 0 values
+    const feedbackData: BarChartData[] = [
+      { label: 'Ninguno', value: 0, color: '#A5A5A5' },      // Gray
+      { label: 'Rector', value: 0, color: '#4472C4' },       // Blue
+      { label: 'Coordinator', value: 0, color: '#FFC000' },  // Yellow
+      { label: 'Otros docentes', value: 0, color: '#70AD47' }, // Green
+      { label: 'Acudientes', value: 0, color: '#ED7D31' },   // Orange
+      { label: 'Estudiantes', value: 0, color: '#5B9BD5' },  // Light Blue
+      { label: 'Otros', value: 0, color: '#7030A0' }         // Purple
+    ];
+
+    // Update values from database
+    rows.forEach(row => {
+      const mappedLabel = labelMapping[row.source] || row.source;
+      console.log('Processing row:', { 
+        original: row.source, 
+        mapped: mappedLabel,
+        count: row.count,
+        type: typeof row.count
+      });
+      const item = feedbackData.find(d => d.label === mappedLabel);
+      if (item) {
+        item.value = parseInt(row.count);
+        console.log('Updated item:', item);
+      } else {
+        console.log('No matching label found for:', mappedLabel);
+      }
+    });
+
+    console.log('Final feedback data:', feedbackData);
+    return feedbackData;
+  } catch (error) {
+    console.error('Error fetching feedback distribution:', error);
+    return [
+      { label: 'Ninguno', value: 0, color: '#A5A5A5' },      // Gray
+      { label: 'Rector', value: 0, color: '#4472C4' },       // Blue
+      { label: 'Coordinator', value: 0, color: '#FFC000' },  // Yellow
+      { label: 'Otros docentes', value: 0, color: '#70AD47' }, // Green
+      { label: 'Acudientes', value: 0, color: '#ED7D31' },   // Orange
+      { label: 'Estudiantes', value: 0, color: '#5B9BD5' },  // Light Blue
+      { label: 'Otros', value: 0, color: '#7030A0' }         // Purple
+    ];
+  }
+}
+
+// Helper function to get years distribution for estudiantes
+async function getYearsDistributionForEstudiantes(school: string): Promise<BarChartData[]> {
+  try {
+    console.log('Fetching years distribution for estudiantes, school:', school);
+    
+    const query = `
+      SELECT 
+        anos_estudiando as year_range,
+        COUNT(*) as count
+      FROM estudiantes_form_submissions
+      WHERE institucion_educativa = $1
+      GROUP BY anos_estudiando
+      ORDER BY 
+        CASE anos_estudiando
+          WHEN 'Menos de 1' THEN 1
+          WHEN '1' THEN 2
+          WHEN '2' THEN 3
+          WHEN '3' THEN 4
+          WHEN '4' THEN 5
+          WHEN '5' THEN 6
+          WHEN 'Más de 5' THEN 7
+          ELSE 8
+        END;
+    `;
+
+    console.log('Executing query:', query.replace(/\s+/g, ' '));
+    const result = await pool.query(query, [school]);
+    console.log('Years distribution raw data:', result.rows);
+
+    // Define the mapping from database values to display labels
+    const labelMapping: Record<string, string> = {
+      'Menos de 1': 'Menos de 1',
+      '1': '1 año',
+      '2': '2 años',
+      '3': '3 años',
+      '4': '4 años',
+      '5': '5 años',
+      'Más de 5': '6 o mas'
+    };
+
+    type YearRange = 'Menos de 1' | '1' | '2' | '3' | '4' | '5' | 'Más de 5';
+    type DisplayLabel = 'Menos de 1' | '1 año' | '2 años' | '3 años' | '4 años' | '5 años' | '6 o mas';
+    
+    const colors: Record<YearRange, string> = {
+      'Menos de 1': '#4472C4',  // Blue
+      '1': '#ED7D31',          // Orange
+      '2': '#A5A5A5',          // Gray
+      '3': '#FFC000',          // Yellow
+      '4': '#5B9BD5',          // Light Blue
+      '5': '#70AD47',          // Green
+      'Más de 5': '#7030A0'    // Purple
+    };
+
+    // Transform the data with display labels
+    const chartData = result.rows.map(row => {
+      console.log('Processing row:', row);
+      const dbValue = row.year_range as YearRange;
+      return {
+        label: labelMapping[dbValue] || dbValue,
+        value: parseInt(row.count),
+        color: colors[dbValue] || '#000000'
+      };
+    });
+
+    // If no data, return default structure with display labels
+    if (chartData.length === 0) {
+      console.log('No data found, returning default structure');
+      return [
+        { label: 'Menos de 1', value: 0, color: '#4472C4' },
+        { label: '1 año', value: 0, color: '#ED7D31' },
+        { label: '2 años', value: 0, color: '#A5A5A5' },
+        { label: '3 años', value: 0, color: '#FFC000' },
+        { label: '4 años', value: 0, color: '#5B9BD5' },
+        { label: '5 años', value: 0, color: '#70AD47' },
+        { label: '6 o mas', value: 0, color: '#7030A0' }
+      ];
+    }
+
+    // Ensure all categories are present with display labels
+    const dbCategories: YearRange[] = ['Menos de 1', '1', '2', '3', '4', '5', 'Más de 5'];
+    const existingCategories = new Set(chartData.map(d => d.label));
+    
+    // Add missing categories with value 0
+    dbCategories.forEach(dbValue => {
+      const displayLabel = labelMapping[dbValue];
+      if (!existingCategories.has(displayLabel)) {
+        chartData.push({
+          label: displayLabel,
+          value: 0,
+          color: colors[dbValue]
+        });
+      }
+    });
+
+    // Sort the data using database values
+    chartData.sort((a, b) => {
+      const order: Record<DisplayLabel, number> = {
+        'Menos de 1': 1,
+        '1 año': 2,
+        '2 años': 3,
+        '3 años': 4,
+        '4 años': 5,
+        '5 años': 6,
+        '6 o mas': 7
+      };
+      return order[a.label as DisplayLabel] - order[b.label as DisplayLabel];
+    });
+
+    return chartData;
+  } catch (error) {
+    console.error('Error fetching years distribution for estudiantes:', error);
+    return [
+      { label: 'Menos de 1', value: 0, color: '#4472C4' },
+      { label: '1 año', value: 0, color: '#ED7D31' },
+      { label: '2 años', value: 0, color: '#A5A5A5' },
+      { label: '3 años', value: 0, color: '#FFC000' },
+      { label: '4 años', value: 0, color: '#5B9BD5' },
+      { label: '5 años', value: 0, color: '#70AD47' },
+      { label: '6 o mas', value: 0, color: '#7030A0' }
+    ];
+  }
+}
+
 // Main function to generate the Encuestados page
 export const generateEncuestadosPage = async (doc: CustomPDFKit, school: string): Promise<void> => {
   // Add a new page with header
@@ -497,98 +864,113 @@ export const generateEncuestadosPage = async (doc: CustomPDFKit, school: string)
   // Add charts section
   const pageHeight = doc.page.height;
   const chartMargin = 30;
-  const chartWidth = (doc.page.width - chartMargin * 3) / 2.5; // Reduced width
-  const chartHeight = 150; // Reduced height
-  const startChartY = doc.y + 10;  // Reduced from +20 to +5
+  const chartWidth = (doc.page.width - chartMargin * 4) / 2.5; // Adjusted width to accommodate legend
+  const chartHeight = 150;
+  const startChartY = doc.y + 10;
 
   // Draw first pie chart (Grades)
-  const gradesData = await getGradesDistribution(school);
-  drawPieChart(
-    doc,
-    gradesData,
-    startX + chartWidth/3,
-    startChartY + chartHeight/2,
-    chartWidth/4,
-    '¿En qué grados tiene clases?',
-    true
+  const gradesData = await getGradesDistribution(school || '');
+  drawPieChartUtil(
+    doc, 
+    gradesData, 
+    startX + chartWidth/4,  // Moved more to the left (changed from chartWidth/2.5)
+    startChartY + chartHeight/2, 
+    chartWidth/4, 
+    '¿En qué grados tiene clases?', 
+    true,    // First chart
+    false,   // Place legend on the right (not below)
+    false    // Don't use multi-line legend
   );
 
-  // Draw vertical separator line
-  const separatorX = doc.page.width / 2;  // Center of the page
+  // Adjust separator position accordingly
+  const separatorX = startX + chartWidth * 1.1; // Adjusted separator position (changed from 1.2)
   const separatorStartY = startChartY + 10;
   const separatorEndY = startChartY + chartHeight - 10;
   doc.save()
      .moveTo(separatorX, separatorStartY)
      .lineTo(separatorX, separatorEndY)
-     .strokeColor('#CCCCCC')  // Light gray color
+     .strokeColor('#CCCCCC')
      .lineWidth(1)
-     .dash(5, { space: 5 })   // Dashed line
+     .dash(5, { space: 5 })
      .stroke()
      .restore();
 
-  // Draw second pie chart (Schedule)
-  const scheduleData = await getScheduleDistribution(school);
-  drawPieChart(
+  // Draw second pie chart (Schedule) - adjusted position
+  const scheduleData = await getScheduleDistribution(school || '');
+  drawPieChartUtil(
     doc,
     scheduleData,
-    startX + chartWidth * 1.4 + chartMargin, // Decreased multiplier from 1.8 to 1.4 to move chart more to the left
+    separatorX + chartWidth/3,  // Adjusted position to make room for right legend
     startChartY + chartHeight/2,
     chartWidth/4,
-    '¿En qué jornada tiene clases?'
+    '¿En qué jornada tiene clases?',
+    false,   // Not first chart
+    false,   // Place legend on the right (not below)
+    false    // Don't use multi-line legend
   );
 
+  // Calculate positions for separators
+  const horizontalSeparatorY = startChartY + chartHeight - 10;  // Changed from +20 to -10 to move higher
+  const verticalSeparatorX = startX + chartWidth * 1.3 + chartMargin;  // Position for vertical separator
+
   // Draw horizontal separator line between pie charts and bar charts
-  const horizontalSeparatorY = startChartY + chartHeight - 10; // Changed from -25 to -5 to move line lower
   doc.save()
      .moveTo(startX, horizontalSeparatorY)
-     .lineTo(doc.page.width - startX, horizontalSeparatorY)
+     .lineTo(verticalSeparatorX, horizontalSeparatorY)  // Extend to vertical separator
      .strokeColor('#CCCCCC')  // Light gray color
      .lineWidth(1)
      .dash(5, { space: 5 })   // Dashed line
      .stroke()
      .restore();
 
-  // Draw first bar chart (Years in IE)
-  const yearsData: BarChartData[] = [
-    { label: 'Menos de 1', value: 1, color: '#4472C4' },  // Blue
-    { label: '1 año', value: 0, color: '#ED7D31' },       // Orange
-    { label: '2 años', value: 1, color: '#A5A5A5' },      // Gray
-    { label: '3 años', value: 3, color: '#FFC000' },      // Yellow
-    { label: '4 años', value: 1, color: '#5B9BD5' },      // Light Blue
-    { label: '5 años', value: 2, color: '#70AD47' },      // Green
-    { label: '6 o mas', value: 8, color: '#7030A0' }      // Purple
-  ];
+  // Update the years bar chart to use real data
+  const yearsData = await getYearsDistribution(school);
+  console.log('Years distribution data:', {
+    data: yearsData,
+    chartPosition: {
+      x: startX,
+      y: horizontalSeparatorY + 5, // Changed from startChartY + chartHeight + 10 to be just below the separator
+      width: chartWidth,
+      height: chartHeight
+    }
+  });
+  
+  // Ensure we have proper positioning
+  const yearsChartX = startX;
+  const yearsChartY = horizontalSeparatorY + 5; // Changed to be just below the separator
+  const yearsChartWidth = chartWidth;
+  const yearsChartHeight = chartHeight;
+
+  // Draw the chart with adjusted padding
   drawBarChart(
     doc,
     yearsData,
-    startX,
-    startChartY + chartHeight - 5,  // Changed from +5 to -5 to move up closer to line
-    chartWidth,
-    chartHeight,
+    yearsChartX,
+    yearsChartY,
+    yearsChartWidth,
+    yearsChartHeight,
     '¿Cuántos años lleva en la IE?',
     true // isHorizontal
   );
 
   // Draw second bar chart (Feedback)
-  const feedbackData: BarChartData[] = [
-    { label: 'Ninguno', value: 0, color: '#A5A5A5' },     // Gray
-    { label: 'Estudiantes', value: 9, color: '#4472C4' },  // Blue
-    { label: 'Coordinador/a', value: 12, color: '#FFC000' }, // Yellow
-    { label: 'Otros docentes', value: 6, color: '#70AD47' }, // Green
-    { label: 'Familias', value: 7, color: '#ED7D31' },      // Orange
-  ];
+  console.log('About to draw feedback chart');
+  const feedbackData = await getFeedbackDistribution(school);
+  console.log('Drawing feedback chart with data:', feedbackData);
+
+  // Draw the chart with adjusted padding
   drawBarChart(
     doc,
     feedbackData,
     startX + chartWidth + chartMargin,
-    startChartY + chartHeight - 5,  // Changed from +5 to -5 to move up closer to line
+    horizontalSeparatorY + 5,  // Position it just below the horizontal separator
     chartWidth,
     chartHeight,
     'Usted recibe retroalimentación de',
     true // isHorizontal
   );
 
-  const barChartsEndY = startChartY + chartHeight + chartHeight - 10;
+  const barChartsEndY = horizontalSeparatorY + chartHeight + 10;
 
   // Add ESTUDIANTES title with background
   const estudiantesY = barChartsEndY - 10;  // Changed from +10 to -10 to move up closer to charts
@@ -620,7 +1002,7 @@ export const generateEncuestadosPage = async (doc: CustomPDFKit, school: string)
 
   // Draw first pie chart (Grades) for estudiantes
   const estudiantesGradesData = await getGradesDistributionForEstudiantes(school);
-  drawPieChart(
+  drawPieChartUtil(
     doc,
     estudiantesGradesData,
     startX + chartWidth/3,
@@ -647,7 +1029,7 @@ export const generateEncuestadosPage = async (doc: CustomPDFKit, school: string)
 
   // Draw second pie chart (Schedule) for estudiantes, moved closer to separator
   const estudiantesScheduleData = await getScheduleDistributionForEstudiantes(school);
-  drawPieChart(
+  drawPieChartUtil(
     doc,
     estudiantesScheduleData,
     startX + chartWidth * 1.0 + chartMargin,  // Reduced from 1.2 to 1.0 to move it more left
@@ -673,25 +1055,27 @@ export const generateEncuestadosPage = async (doc: CustomPDFKit, school: string)
      .restore();
 
   // Draw years bar chart on the right side
-  const yearsDataRight: BarChartData[] = [
-    { label: 'Menos de 1', value: 1, color: '#4472C4' },  // Blue
-    { label: '1 año', value: 0, color: '#ED7D31' },       // Orange
-    { label: '2 años', value: 1, color: '#A5A5A5' },      // Gray
-    { label: '3 años', value: 3, color: '#FFC000' },      // Yellow
-    { label: '4 años', value: 1, color: '#5B9BD5' },      // Light Blue
-    { label: '5 años', value: 2, color: '#70AD47' },      // Green
-    { label: '6 o mas', value: 8, color: '#7030A0' }      // Purple
-  ];
+  const yearsDataRight = await getYearsDistributionForEstudiantes(school);
   drawBarChart(
     doc,
     yearsDataRight,
-    rightSeparatorX + 20,  // Keep 20 points padding from separator
-    estudiantesChartY - 8,
+    verticalSeparatorX + 20,  // Keep 20 points padding from separator
+    estudiantesChartY,   // Changed from -8 to +15 to move chart lower
     chartWidth/1.5,
     chartHeight,
     '¿Cuántos años lleva en la IE?',
     true // isHorizontal
   );
+
+  // Draw vertical separator line
+  doc.save()
+     .moveTo(verticalSeparatorX, estudiantesChartY + 25)
+     .lineTo(verticalSeparatorX, estudiantesChartY + chartHeight - 25)
+     .strokeColor('#CCCCCC')
+     .lineWidth(1)
+     .dash(5, { space: 5 })
+     .stroke()
+     .restore();
 
   // Calculate position for horizontal separator line after legends
   // Account for multi-line legend height (3 rows * 15 points spacing) plus pad
@@ -830,4 +1214,143 @@ export const generateEncuestadosPage = async (doc: CustomPDFKit, school: string)
          width: noteTextWidth - (notePadding * 2),  // Use noteTextWidth here
          align: 'center'
        });
-}; 
+};
+
+function drawPieChart(
+  doc: CustomPDFKit,
+  data: PieChartData[],
+  centerX: number,
+  centerY: number,
+  radius: number,
+  title: string,
+  showLegend: boolean = false,
+  placeLegendBelow: boolean = false,
+  multiLineLegend: boolean = false
+) {
+  try {
+    console.log('Drawing pie chart:', { title, data, centerX, centerY, radius });
+    
+    // Skip if no data or error data
+    if (!data || data.length === 0) {
+      console.log('No data provided for pie chart:', title);
+      return;
+    }
+
+    // Check if we have error data
+    if (data.length === 1 && (data[0].label === 'Error al cargar datos' || data[0].label === 'No hay datos')) {
+      // Draw error message
+      doc.fontSize(10)
+         .fillColor('#666666')
+         .text(data[0].label, centerX - radius, centerY - 10, {
+           width: radius * 2,
+           align: 'center'
+         });
+      return;
+    }
+
+    // Calculate total for percentages
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    if (total === 0) {
+      console.log('Total value is 0 for pie chart:', title);
+      doc.fontSize(10)
+         .fillColor('#666666')
+         .text('No hay datos disponibles', centerX - radius, centerY - 10, {
+           width: radius * 2,
+           align: 'center'
+         });
+      return;
+    }
+
+    // Draw title
+    doc.fontSize(10)
+       .fillColor('black')
+       .text(title, centerX - radius, centerY - radius - 20, {
+         width: radius * 2,
+         align: 'center'
+       });
+
+    let startAngle = 0;
+    data.forEach((segment, index) => {
+      // Calculate angles
+      const segmentAngle = (segment.value / total) * 2 * Math.PI;
+      const endAngle = startAngle + segmentAngle;
+
+      // Draw pie segment using bezier curves
+      doc.save();
+      doc.moveTo(centerX, centerY);
+      
+      // Draw arc using multiple bezier curves
+      const steps = 16;
+      for (let i = 0; i <= steps; i++) {
+        const angle = startAngle + (segmentAngle * i) / steps;
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+        if (i === 0) {
+          doc.lineTo(x, y);
+        } else {
+          doc.lineTo(x, y);
+        }
+      }
+      
+      doc.lineTo(centerX, centerY)
+         .closePath()
+         .fillColor(segment.color)
+         .fill()
+         .restore();
+
+      // Draw percentage in the segment if it's large enough
+      const percentage = Math.round((segment.value / total) * 100);
+      if (percentage > 5) {  // Only show percentage if segment is > 5%
+        const midAngle = startAngle + segmentAngle / 2;
+        const labelRadius = radius * 0.7;  // Position label at 70% of radius
+        const labelX = centerX + labelRadius * Math.cos(midAngle);
+        const labelY = centerY + labelRadius * Math.sin(midAngle);
+        
+        doc.save()
+           .fillColor('white')
+           .fontSize(8)
+           .text(`${percentage}%`,
+             labelX - 10,  // Center the percentage text
+             labelY - 4,   // Adjust for text height
+             {
+               width: 20,
+               align: 'center'
+             })
+           .restore();
+      }
+
+      // Always draw legend on the right side
+      const legendX = centerX + radius * 1.2;  // Position legend to the right of the chart
+      const legendY = centerY - radius + (index * 20);  // Distribute legend items vertically
+
+      // Draw color box
+      doc.rect(legendX, legendY, 10, 10)
+         .fillColor(segment.color)
+         .fill();
+
+      // Draw label
+      doc.fillColor('black')
+         .fontSize(8)
+         .text(segment.label, 
+           legendX + 15, 
+           legendY + 2,
+           {
+             width: 100,  // Give enough width for the label
+             lineBreak: true
+           });
+
+      startAngle = endAngle;
+    });
+
+    console.log('Successfully drew pie chart:', title);
+  } catch (error) {
+    console.error('Error drawing pie chart:', title, error);
+    // Draw error message on the PDF
+    doc.fontSize(10)
+       .fillColor('#FF0000')
+       .text('Error al dibujar el gráfico', centerX - radius, centerY - 10, {
+         width: radius * 2,
+         align: 'center'
+       });
+  }
+} 

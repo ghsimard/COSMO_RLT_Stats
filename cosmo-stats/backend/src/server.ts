@@ -527,9 +527,16 @@ app.get('/api/generate-pdf', async (req, res) => {
   try {
     const school = req.query.school as string | undefined;
     
+    if (!school) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        details: 'School parameter is required'
+      });
+    }
+
     // Set response headers
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=frequency-report${school ? `-${school}` : ''}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=frequency-report-${encodeURIComponent(school)}.pdf`);
     
     // Generate PDF document using the new modular approach
     const doc = await generatePDF(school);
@@ -893,16 +900,22 @@ function drawBarChart(
 // Add helper functions to get chart data
 async function getGradesDistribution(school: string): Promise<PieChartData[]> {
   try {
-    // First, let's log a sample of the raw data
-    const sampleQuery = `
-      SELECT grados_asignados, institucion_educativa 
-      FROM docentes_form_submissions 
-      WHERE institucion_educativa = $1
-      LIMIT 5;
+    console.log('getGradesDistribution called with school:', school);
+    
+    // First, verify the school exists
+    const verifyQuery = `
+      SELECT COUNT(*) as count
+      FROM docentes_form_submissions
+      WHERE institucion_educativa = $1;
     `;
     
-    const sampleResult = await pool.query(sampleQuery, [school]);
-    console.log('Sample data:', JSON.stringify(sampleResult.rows, null, 2));
+    const verifyResult = await pool.query(verifyQuery, [decodeURIComponent(school)]);
+    console.log('School verification result:', verifyResult.rows[0]);
+    
+    if (verifyResult.rows[0].count === 0) {
+      console.log('No data found for school:', school);
+      throw new Error(`No data found for school: ${school}`);
+    }
 
     const query = `
       WITH RECURSIVE 
@@ -912,17 +925,17 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
       grade_data AS (
         SELECT 
           d.institucion_educativa,
-          unnest(d.grados_asignados) as grade
+          TRIM(REGEXP_REPLACE(REGEXP_REPLACE(unnest(d.grados_asignados), '[°|º]', '', 'g'), '\\s+', '', 'g')) as clean_grade
         FROM docentes_form_submissions d
         WHERE d.institucion_educativa = $1
       ),
       grade_counts AS (
         SELECT
           CASE 
-            WHEN grade = 'Preescolar' OR grade = 'Primera infancia' THEN 'Preescolar'
-            WHEN grade IN ('1', '2', '3', '4', '5') THEN 'Primaria'
-            WHEN grade IN ('6', '7', '8', '9') THEN 'Secundaria'
-            WHEN grade IN ('10', '11', '12') THEN 'Media'
+            WHEN clean_grade ILIKE ANY(ARRAY['preescolar', 'primerainfancia', 'primera infancia']) THEN 'Preescolar'
+            WHEN clean_grade ~ '^[1-5]$' THEN 'Primaria'
+            WHEN clean_grade ~ '^[6-9]$' THEN 'Secundaria'
+            WHEN clean_grade ~ '^1[0-1]$' THEN 'Media'
             ELSE 'Otros'
           END as category,
           COUNT(*) as count
@@ -944,11 +957,11 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
         END;
     `;
 
-    console.log('Executing query with school:', school);
-    const result = await pool.query(query, [school]);
-    console.log('Query results:', JSON.stringify(result.rows, null, 2));
+    console.log('Executing grades distribution query...');
+    const result = await pool.query(query, [decodeURIComponent(school)]);
+    console.log('Raw grades distribution result:', result.rows);
 
-    // Define colors and labels with a new color scheme
+    // Define colors for each category
     const categoryConfig: { [key: string]: { color: string, label: string } } = {
       'Preescolar': { color: '#FF9F40', label: 'Preescolar' },  // Warm Orange
       'Primaria': { color: '#4B89DC', label: 'Primaria' },      // Royal Blue
@@ -956,28 +969,34 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
       'Media': { color: '#967ADC', label: 'Media' }             // Purple
     };
 
-    // Transform the data
-    const chartData = result.rows.map(row => ({
-      label: categoryConfig[row.category].label,  // Removed percentage from label
-      value: row.count,
-      color: categoryConfig[row.category].color
-    }));
+    const total = result.rows.reduce((sum, row) => sum + row.count, 0);
+    console.log('Total count:', total);
 
-    // Calculate total for percentage (only used for pie segments)
-    const total = chartData.reduce((sum, item) => sum + item.value, 0);
+    if (total === 0) {
+      console.log('No grades data found for school:', school);
+      return [
+        { label: 'No hay datos', value: 1, color: '#CCCCCC' }
+      ];
+    }
 
-    // Log the final chart data
-    console.log('Final chart data:', JSON.stringify(chartData, null, 2));
+    // Transform the data and calculate percentages
+    const chartData = result.rows.map(row => {
+      const percentage = ((row.count / total) * 100).toFixed(1);
+      console.log(`Processing category ${row.category}: count=${row.count}, percentage=${percentage}%`);
+      return {
+        label: `${categoryConfig[row.category].label} (${percentage}%)`,
+        value: row.count,
+        color: categoryConfig[row.category].color
+      };
+    });
 
+    console.log('Final chart data:', chartData);
     return chartData;
   } catch (error) {
     console.error('Error in getGradesDistribution:', error);
-    // Return default data in case of error
+    // Return a single "Error" segment instead of empty data
     return [
-      { label: 'Preescolar', value: 0, color: '#FF9F40' },
-      { label: 'Primaria', value: 0, color: '#4B89DC' },
-      { label: 'Secundaria', value: 0, color: '#37BC9B' },
-      { label: 'Media', value: 0, color: '#967ADC' }
+      { label: 'Error al cargar datos', value: 1, color: '#FF0000' }
     ];
   }
 }
@@ -1064,7 +1083,23 @@ app.get('/api/test-grades', async (req, res) => {
       return res.status(400).json({ error: 'School parameter is required' });
     }
     
-    console.log('Processing request for school:', school);
+    // Log all available schools first
+    const schoolsQuery = `
+      SELECT DISTINCT institucion_educativa 
+      FROM docentes_form_submissions;
+    `;
+    
+    const schoolsResult = await pool.query(schoolsQuery);
+    console.log('Available schools:', schoolsResult.rows.map(row => row.institucion_educativa));
+    
+    // Decode the school name and normalize it
+    const decodedSchool = decodeURIComponent(school).normalize('NFC');
+    console.log('Processing request for school:', {
+      original: school,
+      decoded: decodedSchool,
+      length: decodedSchool.length,
+      codePoints: Array.from(decodedSchool).map(char => char.codePointAt(0)?.toString(16))
+    });
     
     // First get raw data to debug
     const rawQuery = `
@@ -1074,15 +1109,27 @@ app.get('/api/test-grades', async (req, res) => {
       LIMIT 5;
     `;
     
-    const rawResult = await pool.query(rawQuery, [school]);
+    const rawResult = await pool.query(rawQuery, [decodedSchool]);
     console.log('Raw query results:', JSON.stringify(rawResult.rows, null, 2));
     
-    const data = await getGradesDistribution(school);
+    if (rawResult.rows.length === 0) {
+      console.log('No data found for school:', decodedSchool);
+      return res.status(404).json({ 
+        error: 'No data found for this school',
+        debug: {
+          availableSchools: schoolsResult.rows.map(row => row.institucion_educativa),
+          requestedSchool: decodedSchool
+        }
+      });
+    }
+    
+    const data = await getGradesDistribution(decodedSchool);
     res.json({
-      school,
+      school: decodedSchool,
       data,
       debug: {
-        rawData: rawResult.rows
+        rawData: rawResult.rows,
+        availableSchools: schoolsResult.rows.map(row => row.institucion_educativa)
       }
     });
   } catch (error) {
@@ -1405,6 +1452,37 @@ app.get('/api/generate-all-pdfs', async (req, res) => {
     
   } catch (error) {
     console.error('Error generating all PDFs:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}); 
+
+// Add debug endpoint for grados_asignados
+app.get('/api/debug-grades', async (req, res) => {
+  try {
+    const school = req.query.school as string;
+    if (!school) {
+      return res.status(400).json({ error: 'School parameter is required' });
+    }
+
+    const query = `
+      SELECT grados_asignados
+      FROM docentes_form_submissions
+      WHERE institucion_educativa = $1;
+    `;
+
+    const result = await pool.query(query, [school]);
+    console.log('Raw grados_asignados data:', JSON.stringify(result.rows, null, 2));
+
+    res.json({
+      school,
+      rawData: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
     res.status(500).json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

@@ -219,6 +219,13 @@ export function drawBarChart(
   isHorizontal: boolean = true
 ) {
   try {
+    console.log('drawBarChart called with:', {
+      data,
+      position: { startX, startY, width, height },
+      title,
+      isHorizontal
+    });
+
     // Adjust padding based on whether it's the feedback chart (which needs more label space)
     const isFeedbackChart = title.includes('retroalimentación');
     const padding = { 
@@ -230,12 +237,20 @@ export function drawBarChart(
 
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
-    const maxValue = Math.max(...data.map(d => d.value));
+    const maxValue = Math.max(...data.map(d => d.value), 1); // Ensure maxValue is at least 1 to avoid division by zero
     
+    console.log('Chart calculations:', {
+      padding,
+      chartWidth,
+      chartHeight,
+      maxValue
+    });
+
     // Draw title with more space between it and the chart
     doc.fontSize(10)
        .font('Helvetica-Bold')
-       .text(title, startX, startY + 5, {  // Keep startY + 5 to maintain position below line
+       .fillColor('black')  // Added this line to ensure title is black
+       .text(title, startX, startY + 5, {
          width: width,
          align: 'center'
        });
@@ -245,10 +260,22 @@ export function drawBarChart(
       const barHeight = Math.min(15, (chartHeight - (data.length - 1) * 5) / data.length);
       const barSpacing = barHeight + 5;
 
+      console.log('Bar dimensions:', {
+        barHeight,
+        barSpacing,
+        numberOfBars: data.length
+      });
+
       data.forEach((item, index) => {
         const barWidth = (item.value / maxValue) * chartWidth;
-        const barY = startY + padding.top + index * barSpacing;  // This will now start lower due to increased padding
+        const barY = startY + padding.top + index * barSpacing;
         const barX = startX + padding.left;
+
+        console.log(`Drawing bar ${index}:`, {
+          label: item.label,
+          value: item.value,
+          position: { barX, barY, barWidth, barHeight }
+        });
 
         // Draw label with more space and no text wrapping for feedback chart
         doc.fontSize(8)
@@ -263,18 +290,16 @@ export function drawBarChart(
                 });
 
         // Draw bar
-        doc.rect(barX, barY, barWidth, barHeight)
+        doc.rect(barX, barY, barWidth || 1, barHeight)  // Use minimum width of 1 for zero values
            .fillColor(item.color)
            .fill();
 
         // Draw value
-        if (item.value > 0) {
-          doc.fontSize(8)
-             .fillColor('black')
-             .text(item.value.toString(),
-                  barX + barWidth + 5,
-                  barY + (barHeight / 2) - 4);
-        }
+        doc.fontSize(8)
+           .fillColor('black')
+           .text(item.value.toString(),
+                barX + (barWidth || 1) + 5,  // Adjust text position based on bar width
+                barY + (barHeight / 2) - 4);
       });
     } else {
       // Vertical bars implementation remains unchanged
@@ -285,7 +310,7 @@ export function drawBarChart(
         const barX = startX + 5 + index * (barWidth + 5);
         const barY = startY + (height - 40) - barHeight;
 
-        doc.rect(barX, barY, barWidth, barHeight)
+        doc.rect(barX, barY, barWidth, barHeight || 1)  // Use minimum height of 1 for zero values
            .fillColor(item.color)
            .fill();
 

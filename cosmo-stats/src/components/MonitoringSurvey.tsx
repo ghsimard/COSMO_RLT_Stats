@@ -24,6 +24,7 @@ import {
 import ContactPhoneIcon from '@mui/icons-material/ContactPhone';
 import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
+import { GradesPieChart } from './GradesPieChart';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
 
@@ -197,84 +198,72 @@ export const MonitoringSurvey: React.FC = () => {
             </Alert>
           )}
           
-          <Paper elevation={3}>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Institución</TableCell>
-                    <TableCell align="center">Docentes</TableCell>
-                    <TableCell align="center">Estudiantes</TableCell>
-                    <TableCell align="center">Acudientes</TableCell>
-                    <TableCell align="center">Estado</TableCell>
-                    <TableCell align="center">Contacto</TableCell>
+          <TableContainer component={Paper} sx={{ mb: 4 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Institución Educativa</TableCell>
+                  <TableCell align="center">Docentes</TableCell>
+                  <TableCell align="center">Estudiantes</TableCell>
+                  <TableCell align="center">Acudientes</TableCell>
+                  <TableCell align="center">Contacto</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {schools.map((school) => (
+                  <TableRow key={school.schoolName}>
+                    <TableCell component="th" scope="row">
+                      {school.schoolName}
+                    </TableCell>
+                    <TableCell align="center">
+                      {getSubmissionStatus(school.submissions.docentes)}
+                    </TableCell>
+                    <TableCell align="center">
+                      {getSubmissionStatus(school.submissions.estudiantes)}
+                    </TableCell>
+                    <TableCell align="center">
+                      {getSubmissionStatus(school.submissions.acudientes)}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Tooltip title="Ver información de contacto">
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleContactClick(school)}
+                        >
+                          <ContactPhoneIcon />
+                        </Button>
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {schools.map((school) => (
-                    <TableRow key={`${school.schoolName}-${school.rectorName}`}>
-                      <TableCell>{school.schoolName}</TableCell>
-                      <TableCell align="center">
-                        {getSubmissionStatus(school.submissions.docentes)}
-                      </TableCell>
-                      <TableCell align="center">
-                        {getSubmissionStatus(school.submissions.estudiantes)}
-                      </TableCell>
-                      <TableCell align="center">
-                        {getSubmissionStatus(school.submissions.acudientes)}
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip 
-                          label={school.meetingRequirements ? "Completo" : "Pendiente"}
-                          color={school.meetingRequirements ? "success" : "warning"}
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Tooltip title={school.meetingRequirements ? "Esta institución ya alcanzó el límite requerido de respuestas" : ""}>
-                          <span>
-                            <Button
-                              variant="contained"
-                              color="primary"
-                              size="small"
-                              startIcon={<ContactPhoneIcon />}
-                              onClick={() => handleContactClick(school)}
-                              disabled={school.meetingRequirements}
-                              sx={{
-                                borderRadius: 2,
-                                textTransform: 'none',
-                                minWidth: '120px',
-                                '&:hover': {
-                                  backgroundColor: 'primary.dark',
-                                  transform: 'translateY(-1px)',
-                                  transition: 'transform 0.2s'
-                                },
-                                '&.Mui-disabled': {
-                                  backgroundColor: 'rgba(0, 0, 0, 0.12)',
-                                  color: 'rgba(0, 0, 0, 0.26)'
-                                }
-                              }}
-                            >
-                              Contactar
-                            </Button>
-                          </span>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Add GradesPieChart for selected school */}
+          {selectedSchool && (
+            <Box mt={4}>
+              <Paper elevation={3}>
+                <Box p={3}>
+                  <Typography variant="h6" gutterBottom>
+                    Distribución de Grados - {selectedSchool.schoolName}
+                  </Typography>
+                  <GradesPieChart school={selectedSchool.schoolName} />
+                </Box>
+              </Paper>
+            </Box>
+          )}
+
+          {selectedSchool && (
+            <ContactDialog
+              open={!!selectedSchool}
+              onClose={handleCloseDialog}
+              school={selectedSchool}
+            />
+          )}
         </Box>
       </Container>
-
-      {selectedSchool && (
-        <ContactDialog
-          open={true}
-          onClose={handleCloseDialog}
-          school={selectedSchool}
-        />
-      )}
     </div>
   );
 }; 

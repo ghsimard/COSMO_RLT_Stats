@@ -1,0 +1,11 @@
+
+> backend@1.0.0 dev
+> ts-node src/server.ts
+
+Attempting to connect to database with config: {
+  host: 'localhost',
+  port: 5432,
+  database: 'COSMO_RLT',
+  user: 'postgres',
+  password: '***'
+}
