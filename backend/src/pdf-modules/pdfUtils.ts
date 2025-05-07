@@ -13,10 +13,35 @@ export interface BarChartData {
   color: string;
 }
 
-// Extend PDFKit types
-export interface CustomPDFKit extends PDFKit.PDFDocument {
-  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, anticlockwise?: boolean): this;
-}
+// Define our custom PDFKit type
+export type CustomPDFKit = PDFKit.PDFDocument & {
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, anticlockwise?: boolean): CustomPDFKit;
+  addPage(): CustomPDFKit;
+  page: PDFKit.PDFPage;
+  fontSize(size: number): CustomPDFKit;
+  font(font: string): CustomPDFKit;
+  text: {
+    (text: string, x?: number, y?: number, options?: PDFKit.Mixins.TextOptions): CustomPDFKit;
+    (text: string, options?: PDFKit.Mixins.TextOptions): CustomPDFKit;
+  };
+  moveDown(lines?: number): CustomPDFKit;
+  rect(x: number, y: number, width: number, height: number): CustomPDFKit;
+  fillColor(color: string): CustomPDFKit;
+  fill(): CustomPDFKit;
+  save(): CustomPDFKit;
+  restore(): CustomPDFKit;
+  moveTo(x: number, y: number): CustomPDFKit;
+  lineTo(x: number, y: number): CustomPDFKit;
+  lineWidth(width: number): CustomPDFKit;
+  translate(x: number, y: number): CustomPDFKit;
+  widthOfString(text: string): number;
+  y: number;
+  x: number;
+  image: {
+    (src: string | Buffer, x?: number, y?: number, options?: PDFKit.Mixins.ImageOption): CustomPDFKit;
+    (src: string | Buffer, options?: PDFKit.Mixins.ImageOption): CustomPDFKit;
+  };
+};
 
 // Function to add header to each page (for all pages except the first)
 export const addHeader = (doc: CustomPDFKit) => {
