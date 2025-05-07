@@ -20,4 +20,10 @@ build/
 .vscode/
 *.swp
 *.swo
-.DS_Store 
+.DS_Store
+
+# Database files
+data/
+*.db
+*.sqlite
+*.sqlite3 
