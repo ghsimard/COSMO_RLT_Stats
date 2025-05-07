@@ -14,7 +14,6 @@ services:
     buildFilter:
       paths:
       - backend/**
-    rootDirectory: .
 
   - type: web
     name: cosmo-rlt-stats-ui
@@ -30,5 +29,4 @@ services:
         value: 4000
     buildFilter:
       paths:
-      - frontend/**
-    rootDirectory: . 
+      - frontend/** 
