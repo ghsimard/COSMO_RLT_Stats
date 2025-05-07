@@ -8,6 +8,9 @@ export const config = {
       : 'http://localhost:4000'
   },
   database: {
-    connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/COSMO_RLT'
+    connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/COSMO_RLT',
+    ssl: process.env.NODE_ENV === 'production' ? {
+      rejectUnauthorized: false
+    } : false
   }
 }; 

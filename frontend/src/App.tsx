@@ -5,6 +5,7 @@ import { Dashboard } from './components/Dashboard';
 import { FrequencyChart } from './components/FrequencyChart';
 import { MonitoringSurvey } from './components/MonitoringSurvey';
 import { Navigation } from './components/Navigation';
+import { config } from './config';
 
 const theme = createTheme({
   palette: {
@@ -21,7 +22,7 @@ const theme = createTheme({
 export const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
-      <Router>
+      <Router basename={process.env.NODE_ENV === 'production' ? '/' : undefined}>
         <Navigation />
         <Container maxWidth="lg">
           <Switch>

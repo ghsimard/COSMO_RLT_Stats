@@ -8,9 +8,7 @@ console.log('Attempting to connect to database with connection string:', config.
 
 export const pool = new Pool({
   connectionString: config.database.connectionString,
-  ssl: {
-    rejectUnauthorized: false // Required for Render PostgreSQL
-  }
+  ssl: config.database.ssl
 });
 
 // Test the connection
