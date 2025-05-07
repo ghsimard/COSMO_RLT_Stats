@@ -137,7 +137,7 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
       const percentage = ((row.count / total) * 100).toFixed(1);
       console.log(`Processing category ${row.category}: count=${row.count}, percentage=${percentage}%`);
       return {
-        label: `${categoryConfig[row.category].label} (${percentage}%)`,
+        label: `${categoryConfig[row.category].label}`,
         value: row.count,
         color: categoryConfig[row.category].color
       };
@@ -254,14 +254,25 @@ async function getGradesDistributionForEstudiantes(school: string): Promise<PieC
       '12': '#C00000'  // Dark Red
     };
 
+    // Map grade numbers to Spanish names
+    const gradeNames: Record<string, string> = {
+      '5': 'Quinto',
+      '6': 'Sexto',
+      '7': 'Séptimo',
+      '8': 'Octavo',
+      '9': 'Noveno',
+      '10': 'Décimo',
+      '11': 'Undécimo',
+      '12': 'Duodécimo'
+    };
+
     const total = result.rows.reduce((sum, row) => sum + parseInt(row.count), 0);
     console.log('Total count:', total);
 
     const chartData = result.rows.map(row => {
       const grade = row.category.replace('°', '').replace('º', '');
-      const percentage = total > 0 ? (parseInt(row.count) / total * 100).toFixed(1) : '0.0';
       return {
-        label: `${grade}° (${percentage}%)`,
+        label: gradeNames[grade] || grade,
         value: parseInt(row.count),
         color: gradeColors[grade] || '#000000'
       };
@@ -272,14 +283,14 @@ async function getGradesDistributionForEstudiantes(school: string): Promise<PieC
   } catch (error) {
     console.error('Error in getGradesDistributionForEstudiantes:', error);
     return [
-      { label: '5° (0%)', value: 0, color: '#4472C4' },
-      { label: '6° (0%)', value: 0, color: '#ED7D31' },
-      { label: '7° (0%)', value: 0, color: '#A5A5A5' },
-      { label: '8° (0%)', value: 0, color: '#FFC000' },
-      { label: '9° (0%)', value: 0, color: '#5B9BD5' },
-      { label: '10° (0%)', value: 0, color: '#70AD47' },
-      { label: '11° (0%)', value: 0, color: '#7030A0' },
-      { label: '12° (0%)', value: 0, color: '#C00000' }
+      { label: 'Quinto', value: 0, color: '#4472C4' },
+      { label: 'Sexto', value: 0, color: '#ED7D31' },
+      { label: 'Séptimo', value: 0, color: '#A5A5A5' },
+      { label: 'Octavo', value: 0, color: '#FFC000' },
+      { label: 'Noveno', value: 0, color: '#5B9BD5' },
+      { label: 'Décimo', value: 0, color: '#70AD47' },
+      { label: 'Undécimo', value: 0, color: '#7030A0' },
+      { label: 'Duodécimo', value: 0, color: '#C00000' }
     ];
   }
 }

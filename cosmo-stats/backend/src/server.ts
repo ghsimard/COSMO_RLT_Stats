@@ -1234,23 +1234,8 @@ async function getGradosEstudiantesDistribution(school: string): Promise<PieChar
 } 
 
 // Add helper functions for estudiantes charts
-async function getGradesDistributionForEstudiantes(school: string) {
+async function getGradesDistributionForEstudiantes(school: string): Promise<PieChartData[]> {
   try {
-    // First verify if we have data for this school
-    const verifyQuery = `
-      SELECT COUNT(*) 
-      FROM estudiantes_form_submissions 
-      WHERE institucion_educativa = $1
-    `;
-    const verifyResult = await pool.query(verifyQuery, [school]);
-    console.log('School verification result:', verifyResult.rows[0]);
-
-    if (parseInt(verifyResult.rows[0].count) === 0) {
-      console.log('No data found for school:', school);
-      return [];
-    }
-
-    console.log('Executing grades distribution query...');
     const query = `
       SELECT 
         grado_actual as category,
@@ -1260,33 +1245,47 @@ async function getGradesDistributionForEstudiantes(school: string) {
       GROUP BY grado_actual
       ORDER BY CAST(REPLACE(REPLACE(grado_actual, '°', ''), 'º', '') AS INTEGER);
     `;
-
+    console.log('Executing grades distribution query for estudiantes:', query);
     const result = await pool.query(query, [school]);
     console.log('Raw grades distribution result:', result.rows);
-
-    const total = result.rows.reduce((sum, row) => sum + parseInt(row.count), 0);
-    console.log('Total count:', total);
-
-    const gradeColors: Record<string, string> = {
-      '5': '#4472C4',  // Blue
-      '6': '#ED7D31',  // Orange
-      '7': '#A5A5A5',  // Gray
-      '8': '#FFC000',  // Yellow
-      '9': '#5B9BD5',  // Light Blue
+    // Define colors for each grade
+    const gradeColors: { [key: string]: string } = {
+      '5': '#4472C4', // Blue
+      '6': '#ED7D31', // Orange
+      '7': '#A5A5A5', // Gray
+      '8': '#FFC000', // Yellow
+      '9': '#5B9BD5', // Light Blue
       '10': '#70AD47', // Green
       '11': '#7030A0', // Purple
-      '12': '#C00000'  // Dark Red
+      '12': '#C00000' // Dark Red
     };
 
-    return result.rows.map(row => {
+    // Map grade numbers to Spanish names
+    const gradeNames: { [key: string]: string } = {
+      '5': 'Quinto',
+      '6': 'Sexto',
+      '7': 'Séptimo',
+      '8': 'Octavo',
+      '9': 'Noveno',
+      '10': 'Décimo',
+      '11': 'Undécimo',
+      '12': 'Duodécimo'
+    };
+
+    const total = result.rows.reduce((sum: number, row: any) => sum + parseInt(row.count), 0);
+    console.log('Total count:', total);
+    const chartData = result.rows.map((row: any) => {
       const grade = row.category.replace('°', '').replace('º', '');
       return {
-        label: `${grade}°`,
+        label: gradeNames[grade] || grade,
         value: parseInt(row.count),
         color: gradeColors[grade] || '#000000'
       };
     });
-  } catch (error) {
+    console.log('Final chart data:', chartData);
+    return chartData;
+  }
+  catch (error) {
     console.error('Error in getGradesDistributionForEstudiantes:', error);
     return [];
   }
