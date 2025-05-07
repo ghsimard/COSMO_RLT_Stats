@@ -3,8 +3,13 @@ services:
     name: cosmo-rlt-stats
     env: node
     nodeVersion: 18.17.0
-    buildCommand: cd backend && npm install && npm run build
-    startCommand: cd backend && npm start
+    buildCommand: |
+      cd backend
+      npm install
+      npm run build
+    startCommand: |
+      cd backend
+      npm start
     envVars:
       - key: NODE_ENV
         value: production
@@ -20,8 +25,14 @@ services:
     name: cosmo-rlt-stats-ui
     env: node
     nodeVersion: 18.17.0
-    buildCommand: cd frontend && npm install && npm run build && npm install -g serve
-    startCommand: cd frontend && serve -s build -l 4000
+    buildCommand: |
+      cd frontend
+      npm install
+      npm run build
+      npm install -g serve
+    startCommand: |
+      cd frontend
+      serve -s build -l 4000
     envVars:
       - key: NODE_ENV
         value: production
