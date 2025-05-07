@@ -351,6 +351,17 @@ app.get('/api/frequency-ratings', async (req, res) => {
     const school = req.query.school as string | undefined;
     console.log(`Fetching frequency ratings${school ? ` for school: ${school}` : ' for all schools'}`);
     
+    // Check if tables exist
+    const tables = ['docentes_form_submissions', 'estudiantes_form_submissions', 'acudientes_form_submissions'];
+    for (const table of tables) {
+      try {
+        const result = await pool.query(`SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1)`, [table]);
+        console.log(`Table ${table} exists:`, result.rows[0].exists);
+      } catch (error) {
+        console.error(`Error checking if table ${table} exists:`, error);
+      }
+    }
+    
     const results: FrequencyData[] = [];
 
     for (const [sectionKey, section] of Object.entries(sections)) {
