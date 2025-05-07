@@ -1,27 +1,0 @@
-* Host localhost:3001 was resolved.
-* IPv6: ::1
-* IPv4: 127.0.0.1
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying [::1]:3001...
-* Connected to localhost (::1) port 3001
-> GET /api/test-grades?school=Instituci%c3%b3n+Educativa+Diego+Echavarria+Misas HTTP/1.1
-> Host: localhost:3001
-> User-Agent: curl/8.7.1
-> Accept: */*
-> 
-* Request completely sent off
-< HTTP/1.1 200 OK
-< X-Powered-By: Express
-< Access-Control-Allow-Origin: *
-< Content-Type: application/json; charset=utf-8
-< Content-Length: 264
-< ETag: W/"108-H6p0AOrk/dmqzD1phB2+Ks3qy0c"
-< Date: Thu, 01 May 2025 17:00:24 GMT
-< Connection: keep-alive
-< Keep-Alive: timeout=5
-< 
-{ [264 bytes data]
-100   264  100   264    0     0  16375      0 --:--:-- --:--:-- --:--:-- 16500
-* Connection #0 to host localhost left intact
-{"school":"Institución Educativa Diego Echavarria Misas","data":[{"label":"Preescolar","value":0,"color":"#4472C4"},{"label":"Primaria","value":0,"color":"#ED7D31"},{"label":"Secundaria","value":0,"color":"#A5A5A5"},{"label":"Media","value":0,"color":"#FFC000"}]}
