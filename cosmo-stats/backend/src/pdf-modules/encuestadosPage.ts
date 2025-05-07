@@ -369,6 +369,7 @@ async function getGradosEstudiantesDistribution(school: string): Promise<PieChar
         COUNT(*) as count
       FROM grade_data
       GROUP BY grade
+      HAVING COUNT(*) > 0  -- Only include grades with data
       ORDER BY 
         CASE grade
           WHEN 'Preescolar' THEN 0
@@ -384,67 +385,54 @@ async function getGradosEstudiantesDistribution(school: string): Promise<PieChar
       'Preescolar': '#FF9F40',      // Warm Orange
       'Primera infancia': '#FF9F40', // Same as Preescolar
       '1': '#4472C4',               // Blue
+      '1°': '#4472C4',              // Blue (with degree symbol)
       '2': '#ED7D31',               // Orange
+      '2°': '#ED7D31',              // Orange (with degree symbol)
       '3': '#A5A5A5',               // Gray
+      '3°': '#A5A5A5',              // Gray (with degree symbol)
       '4': '#FFC000',               // Yellow
+      '4°': '#FFC000',              // Yellow (with degree symbol)
       '5': '#5B9BD5',               // Light Blue
+      '5°': '#5B9BD5',              // Light Blue (with degree symbol)
       '6': '#70AD47',               // Green
+      '6°': '#70AD47',              // Green (with degree symbol)
       '7': '#264478',               // Dark Blue
+      '7°': '#264478',              // Dark Blue (with degree symbol)
       '8': '#9E480E',               // Dark Orange
+      '8°': '#9E480E',              // Dark Orange (with degree symbol)
       '9': '#636363',               // Dark Gray
+      '9°': '#636363',              // Dark Gray (with degree symbol)
       '10': '#997300',              // Dark Yellow
+      '10°': '#997300',             // Dark Yellow (with degree symbol)
       '11': '#2F5597',              // Dark Blue
-      '12': '#385723'               // Dark Green
+      '11°': '#2F5597',             // Dark Blue (with degree symbol)
+      '12': '#385723',              // Dark Green
+      '12°': '#385723'              // Dark Green (with degree symbol)
     };
 
     // Transform the data
     const chartData = result.rows.map(row => {
       const grade = row.category;
       const label = grade === 'Preescolar' || grade === 'Primera infancia' ? grade : `Grado ${grade}`;
+      const color = gradeColors[grade] || '#CCCCCC';  // Use default gray only if grade not found
+      console.log(`Processing grade ${grade}: color=${color}`);  // Debug log
       return {
         label: label,
         value: parseInt(row.count),
-        color: gradeColors[grade] || '#CCCCCC'
+        color: color
       };
     });
 
-    // Return default data if no results
+    // Return empty array if no results
     if (chartData.length === 0) {
-      return [
-        { label: 'Preescolar', value: 0, color: '#FF9F40' },
-        { label: 'Grado 1', value: 0, color: '#4472C4' },
-        { label: 'Grado 2', value: 0, color: '#ED7D31' },
-        { label: 'Grado 3', value: 0, color: '#A5A5A5' },
-        { label: 'Grado 4', value: 0, color: '#FFC000' },
-        { label: 'Grado 5', value: 0, color: '#5B9BD5' },
-        { label: 'Grado 6', value: 0, color: '#70AD47' },
-        { label: 'Grado 7', value: 0, color: '#264478' },
-        { label: 'Grado 8', value: 0, color: '#9E480E' },
-        { label: 'Grado 9', value: 0, color: '#636363' },
-        { label: 'Grado 10', value: 0, color: '#997300' },
-        { label: 'Grado 11', value: 0, color: '#2F5597' },
-        { label: 'Grado 12', value: 0, color: '#385723' }
-      ];
+      return [];
     }
 
+    console.log('Final chart data:', chartData);  // Debug log
     return chartData;
   } catch (error) {
     console.error('Error in getGradosEstudiantesDistribution:', error);
-    return [
-      { label: 'Preescolar', value: 0, color: '#FF9F40' },
-      { label: 'Grado 1', value: 0, color: '#4472C4' },
-      { label: 'Grado 2', value: 0, color: '#ED7D31' },
-      { label: 'Grado 3', value: 0, color: '#A5A5A5' },
-      { label: 'Grado 4', value: 0, color: '#FFC000' },
-      { label: 'Grado 5', value: 0, color: '#5B9BD5' },
-      { label: 'Grado 6', value: 0, color: '#70AD47' },
-      { label: 'Grado 7', value: 0, color: '#264478' },
-      { label: 'Grado 8', value: 0, color: '#9E480E' },
-      { label: 'Grado 9', value: 0, color: '#636363' },
-      { label: 'Grado 10', value: 0, color: '#997300' },
-      { label: 'Grado 11', value: 0, color: '#2F5597' },
-      { label: 'Grado 12', value: 0, color: '#385723' }
-    ];
+    return [];
   }
 }
 
