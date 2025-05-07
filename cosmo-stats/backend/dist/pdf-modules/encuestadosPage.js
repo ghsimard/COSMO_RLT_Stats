@@ -237,65 +237,37 @@ function getGradesDistributionForEstudiantes(school) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const query = `
-      WITH grade_data AS (
-        SELECT 
-          d.institucion_educativa,
-          CASE
-            WHEN d.grado_actual = '5' THEN 'Quinto'
-            WHEN d.grado_actual = '6' THEN 'Sexto'
-            WHEN d.grado_actual = '7' THEN 'Septimo'
-            WHEN d.grado_actual = '8' THEN 'Octavo'
-            WHEN d.grado_actual = '9' THEN 'Noveno'
-            WHEN d.grado_actual = '10' THEN 'Decimo'
-            WHEN d.grado_actual = '11' THEN 'Undécimo'
-            WHEN d.grado_actual = '12' THEN 'Duodécimo'
-            ELSE d.grado_actual
-          END as grade
-        FROM estudiantes_form_submissions d
-        WHERE d.institucion_educativa = $1
-      )
       SELECT 
-        grade as category,
+        grado_actual as category,
         COUNT(*) as count
-      FROM grade_data
-      GROUP BY grade
-      ORDER BY 
-        CASE grade
-          WHEN 'Quinto' THEN 5
-          WHEN 'Sexto' THEN 6
-          WHEN 'Septimo' THEN 7
-          WHEN 'Octavo' THEN 8
-          WHEN 'Noveno' THEN 9
-          WHEN 'Decimo' THEN 10
-          WHEN 'Undécimo' THEN 11
-          WHEN 'Duodécimo' THEN 12
-          ELSE 99
-        END;
+      FROM estudiantes_form_submissions
+      WHERE institucion_educativa = $1
+      GROUP BY grado_actual
+      ORDER BY CAST(REPLACE(REPLACE(grado_actual, '°', ''), 'º', '') AS INTEGER);
     `;
             console.log('Executing grades distribution query for estudiantes:', query);
             const result = yield db_1.pool.query(query, [school]);
             console.log('Raw grades distribution result:', result.rows);
             // Define colors for each grade
-            const gradeMapping = {
-                'Quinto': { color: '#4472C4' }, // Blue
-                'Sexto': { color: '#ED7D31' }, // Orange
-                'Septimo': { color: '#A5A5A5' }, // Gray
-                'Octavo': { color: '#FFC000' }, // Yellow
-                'Noveno': { color: '#5B9BD5' }, // Light Blue
-                'Decimo': { color: '#70AD47' }, // Green
-                'Undécimo': { color: '#7030A0' }, // Purple
-                'Duodécimo': { color: '#C00000' } // Dark Red
+            const gradeColors = {
+                '5': '#4472C4', // Blue
+                '6': '#ED7D31', // Orange
+                '7': '#A5A5A5', // Gray
+                '8': '#FFC000', // Yellow
+                '9': '#5B9BD5', // Light Blue
+                '10': '#70AD47', // Green
+                '11': '#7030A0', // Purple
+                '12': '#C00000' // Dark Red
             };
             const total = result.rows.reduce((sum, row) => sum + parseInt(row.count), 0);
             console.log('Total count:', total);
             const chartData = result.rows.map(row => {
-                var _a;
-                const percentage = total > 0 ? ((parseInt(row.count) / total) * 100).toFixed(1) : '0.0';
-                console.log(`Processing category ${row.category}: count=${row.count}, percentage=${percentage}%`);
+                const grade = row.category.replace('°', '').replace('º', '');
+                const percentage = total > 0 ? (parseInt(row.count) / total * 100).toFixed(1) : '0.0';
                 return {
-                    label: row.category,
+                    label: `${grade}° (${percentage}%)`,
                     value: parseInt(row.count),
-                    color: ((_a = gradeMapping[row.category]) === null || _a === void 0 ? void 0 : _a.color) || '#000000'
+                    color: gradeColors[grade] || '#000000'
                 };
             });
             console.log('Final chart data:', chartData);
@@ -304,10 +276,14 @@ function getGradesDistributionForEstudiantes(school) {
         catch (error) {
             console.error('Error in getGradesDistributionForEstudiantes:', error);
             return [
-                { label: 'Preescolar', value: 0, color: '#FF9F40' },
-                { label: 'Primaria', value: 0, color: '#4B89DC' },
-                { label: 'Secundaria', value: 0, color: '#37BC9B' },
-                { label: 'Media', value: 0, color: '#967ADC' }
+                { label: '5° (0%)', value: 0, color: '#4472C4' },
+                { label: '6° (0%)', value: 0, color: '#ED7D31' },
+                { label: '7° (0%)', value: 0, color: '#A5A5A5' },
+                { label: '8° (0%)', value: 0, color: '#FFC000' },
+                { label: '9° (0%)', value: 0, color: '#5B9BD5' },
+                { label: '10° (0%)', value: 0, color: '#70AD47' },
+                { label: '11° (0%)', value: 0, color: '#7030A0' },
+                { label: '12° (0%)', value: 0, color: '#C00000' }
             ];
         }
     });

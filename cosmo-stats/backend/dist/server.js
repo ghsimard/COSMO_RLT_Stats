@@ -16,8 +16,9 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const db_1 = require("./db");
 const pdfGenerator_1 = require("./pdf-modules/pdfGenerator");
+const config_1 = require("./config");
 const app = (0, express_1.default)();
-const port = process.env.PORT || 4001;
+const port = config_1.config.port;
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 // Test query to check table access and column names
@@ -851,12 +852,23 @@ function getGradesDistribution(school) {
             }
             // Transform the data and calculate percentages
             const chartData = result.rows.map(row => {
+                var _a;
                 const percentage = ((row.count / total) * 100).toFixed(1);
                 console.log(`Processing category ${row.category}: count=${row.count}, percentage=${percentage}%`);
+                // Normalize the grade format to handle both ° and º symbols
+                const normalizedGrade = row.category.replace(/[°º]/g, 'º');
+                console.log('Normalized grade:', normalizedGrade);
+                const color = (_a = categoryConfig[normalizedGrade]) === null || _a === void 0 ? void 0 : _a.color;
+                console.log(`Color lookup for ${row.category}:`, {
+                    original: row.category,
+                    normalized: normalizedGrade,
+                    hasMapping: normalizedGrade in categoryConfig,
+                    color: color || '#000000'
+                });
                 return {
-                    label: `${categoryConfig[row.category].label} (${percentage}%)`,
+                    label: `${categoryConfig[normalizedGrade].label} (${percentage}%)`,
                     value: row.count,
-                    color: categoryConfig[row.category].color
+                    color: color || '#000000'
                 };
             });
             console.log('Final chart data:', chartData);
@@ -1098,6 +1110,19 @@ function getGradosEstudiantesDistribution(school) {
 function getGradesDistributionForEstudiantes(school) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
+            // First verify if we have data for this school
+            const verifyQuery = `
+      SELECT COUNT(*) 
+      FROM estudiantes_form_submissions 
+      WHERE institucion_educativa = $1
+    `;
+            const verifyResult = yield db_1.pool.query(verifyQuery, [school]);
+            console.log('School verification result:', verifyResult.rows[0]);
+            if (parseInt(verifyResult.rows[0].count) === 0) {
+                console.log('No data found for school:', school);
+                return [];
+            }
+            console.log('Executing grades distribution query...');
             const query = `
       WITH grade_data AS (
         SELECT 
@@ -1105,10 +1130,10 @@ function getGradesDistributionForEstudiantes(school) {
           CASE
             WHEN d.grado_actual = '5' THEN 'Quinto'
             WHEN d.grado_actual = '6' THEN 'Sexto'
-            WHEN d.grado_actual = '7' THEN 'Septimo'
+            WHEN d.grado_actual = '7' THEN 'Séptimo'
             WHEN d.grado_actual = '8' THEN 'Octavo'
             WHEN d.grado_actual = '9' THEN 'Noveno'
-            WHEN d.grado_actual = '10' THEN 'Decimo'
+            WHEN d.grado_actual = '10' THEN 'Décimo'
             WHEN d.grado_actual = '11' THEN 'Undécimo'
             WHEN d.grado_actual = '12' THEN 'Duodécimo'
             ELSE d.grado_actual
@@ -1125,52 +1150,40 @@ function getGradesDistributionForEstudiantes(school) {
         CASE grade
           WHEN 'Quinto' THEN 5
           WHEN 'Sexto' THEN 6
-          WHEN 'Septimo' THEN 7
+          WHEN 'Séptimo' THEN 7
           WHEN 'Octavo' THEN 8
           WHEN 'Noveno' THEN 9
-          WHEN 'Decimo' THEN 10
+          WHEN 'Décimo' THEN 10
           WHEN 'Undécimo' THEN 11
           WHEN 'Duodécimo' THEN 12
           ELSE 99
         END;
     `;
-            console.log('Executing grades distribution query for estudiantes:', query);
             const result = yield db_1.pool.query(query, [school]);
             console.log('Raw grades distribution result:', result.rows);
-            // Define colors for each grade
-            const gradeMapping = {
-                'Quinto': { color: '#4472C4' }, // Blue
-                'Sexto': { color: '#ED7D31' }, // Orange
-                'Septimo': { color: '#A5A5A5' }, // Gray
-                'Octavo': { color: '#FFC000' }, // Yellow
-                'Noveno': { color: '#5B9BD5' }, // Light Blue
-                'Decimo': { color: '#70AD47' }, // Green
-                'Undécimo': { color: '#7030A0' }, // Purple
-                'Duodécimo': { color: '#C00000' } // Dark Red
-            };
-            const total = result.rows.reduce((sum, row) => sum + row.count, 0);
+            const total = result.rows.reduce((sum, row) => sum + parseInt(row.count), 0);
             console.log('Total count:', total);
-            const chartData = result.rows.map(row => {
-                var _a;
-                const percentage = total > 0 ? ((row.count / total) * 100).toFixed(1) : '0.0';
-                console.log(`Processing category ${row.category}: count=${row.count}, percentage=${percentage}%`);
+            const gradeColors = {
+                'Quinto': '#4472C4', // Blue
+                'Sexto': '#ED7D31', // Orange
+                'Séptimo': '#A5A5A5', // Gray
+                'Octavo': '#FFC000', // Yellow
+                'Noveno': '#5B9BD5', // Light Blue
+                'Décimo': '#70AD47', // Green
+                'Undécimo': '#7030A0', // Purple
+                'Duodécimo': '#C00000' // Dark Red
+            };
+            return result.rows.map(row => {
                 return {
                     label: row.category,
                     value: parseInt(row.count),
-                    color: ((_a = gradeMapping[row.category]) === null || _a === void 0 ? void 0 : _a.color) || '#000000'
+                    color: gradeColors[row.category] || '#000000'
                 };
             });
-            console.log('Final chart data:', chartData);
-            return chartData;
         }
         catch (error) {
             console.error('Error in getGradesDistributionForEstudiantes:', error);
-            return [
-                { label: 'Preescolar', value: 0, color: '#FF9F40' },
-                { label: 'Primaria', value: 0, color: '#4B89DC' },
-                { label: 'Secundaria', value: 0, color: '#37BC9B' },
-                { label: 'Media', value: 0, color: '#967ADC' }
-            ];
+            return [];
         }
     });
 }
@@ -1319,6 +1332,34 @@ app.get('/api/debug-grades', (req, res) => __awaiter(void 0, void 0, void 0, fun
     }
     catch (error) {
         console.error('Error in debug endpoint:', error);
+        res.status(500).json({
+            error: 'Internal server error',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+}));
+// Add endpoint for estudiantes grades
+app.get('/api/estudiantes-grades', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const school = req.query.school;
+        if (!school) {
+            console.log('Missing school parameter');
+            return res.status(400).json({ error: 'School parameter is required' });
+        }
+        console.log('Getting grades distribution for school:', school);
+        const data = yield getGradesDistributionForEstudiantes(decodeURIComponent(school));
+        console.log('Grades distribution data:', JSON.stringify(data, null, 2));
+        res.json({
+            school: decodeURIComponent(school),
+            data,
+            debug: {
+                school: decodeURIComponent(school),
+                rawData: data
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error in estudiantes-grades endpoint:', error);
         res.status(500).json({
             error: 'Internal server error',
             details: error instanceof Error ? error.message : 'Unknown error'

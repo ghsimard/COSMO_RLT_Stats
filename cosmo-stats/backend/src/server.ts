@@ -6,11 +6,14 @@ import { QueryResult } from 'pg';
 import PDFKit from 'pdfkit';
 import path from 'path';
 import { generatePDF } from './pdf-modules/pdfGenerator';
+import { config } from './config';
 
 const app = express();
-const port = process.env.PORT || 4001;
+const port = config.ports.backend;
 
-app.use(cors());
+app.use(cors({
+  origin: config.cors.origin
+}));
 app.use(express.json());
 
 // Test query to check table access and column names
@@ -658,10 +661,9 @@ function drawPieChart(
          align: 'center'
        });
 
-    // Draw pie segments with percentages
+    // Draw pie segments
     data.forEach(item => {
       const segmentAngle = (item.value / total) * 2 * Math.PI;
-      const percentage = Math.round((item.value / total) * 100);
       
       // Draw segment
       doc.save()
@@ -670,26 +672,6 @@ function drawPieChart(
          .lineTo(centerX, centerY)
          .fillColor(item.color)
          .fill();
-
-      // Calculate position for percentage text
-      const midAngle = currentAngle + (segmentAngle / 2);
-      const textRadius = radius * 0.65;
-      const textX = centerX + Math.cos(midAngle) * textRadius;
-      const textY = centerY + Math.sin(midAngle) * textRadius;
-
-      // Draw percentage with white text
-      if (percentage > 3) {
-        doc.fillColor('white')
-           .fontSize(9)
-           .font('Helvetica-Bold')
-           .text(`${percentage}%`, 
-             textX - 12,
-             textY - 5,
-             {
-               width: 24,
-               align: 'center'
-             });
-      }
       
       doc.restore();
       currentAngle += segmentAngle;
@@ -981,8 +963,7 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
 
     // Transform the data and calculate percentages
     const chartData = result.rows.map(row => {
-      const percentage = ((row.count / total) * 100).toFixed(1);
-      console.log(`Processing category ${row.category}: count=${row.count}, percentage=${percentage}%`);
+      console.log(`Processing category ${row.category}: count=${row.count}`);
       
       // Normalize the grade format to handle both ° and º symbols
       const normalizedGrade = row.category.replace(/[°º]/g, 'º');
@@ -997,7 +978,7 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
       });
       
       return {
-        label: `${categoryConfig[normalizedGrade].label} (${percentage}%)`,
+        label: categoryConfig[normalizedGrade].label,
         value: row.count,
         color: color || '#000000'
       };
@@ -1299,9 +1280,8 @@ async function getGradesDistributionForEstudiantes(school: string) {
 
     return result.rows.map(row => {
       const grade = row.category.replace('°', '').replace('º', '');
-      const percentage = total > 0 ? (parseInt(row.count) / total * 100).toFixed(1) : '0.0';
       return {
-        label: `${grade}° (${percentage}%)`,
+        label: `${grade}°`,
         value: parseInt(row.count),
         color: gradeColors[grade] || '#000000'
       };
