@@ -1,10 +1,9 @@
 services:
   - type: web
-    name: cosmo-rlt-stats
+    name: cosmo-stats-backend
     env: node
-    nodeVersion: 18.17.0
-    buildCommand: bash -c "cd backend && npm install && npm install --save-dev @types/pdfkit && npm run build"
-    startCommand: bash -c "cd backend && npm start"
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
@@ -15,20 +14,22 @@ services:
     buildFilter:
       paths:
       - backend/**
+    rootDirectory: backend
 
   - type: web
-    name: cosmo-rlt-stats-ui
+    name: cosmo-stats-frontend
     env: node
     nodeVersion: 18.17.0
-    buildCommand: bash -c "cd frontend && npm install && npm run build && npm install -g serve"
-    startCommand: bash -c "cd frontend && serve -s build -l 4000"
+    buildCommand: npm install && npm run build
+    startCommand: npx serve -s build -l $PORT
     envVars:
       - key: NODE_ENV
         value: production
       - key: REACT_APP_API_URL
-        value: https://cosmo-rlt-stats.onrender.com
+        value: https://cosmo-stats-backend.onrender.com
       - key: PORT
         value: 4000
     buildFilter:
       paths:
-      - frontend/** 
+      - frontend/**
+    rootDirectory: frontend 
