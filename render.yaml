@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: cosmo-stats-backend
+    name: cosmo-rlt-stats
     env: node
     buildCommand: cd backend && npm install && npm run build
     startCommand: cd backend && npm start
@@ -17,7 +17,7 @@ services:
     rootDirectory: .
 
   - type: web
-    name: cosmo-stats-frontend
+    name: cosmo-rlt-stats-ui
     env: node
     buildCommand: cd frontend && npm install && npm run build && npm install -g serve
     startCommand: cd frontend && serve -s build -l 4000
@@ -25,7 +25,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: REACT_APP_API_URL
-        value: https://cosmo-stats-backend.onrender.com
+        value: https://cosmo-rlt-stats.onrender.com
       - key: PORT
         value: 4000
     buildFilter:
