@@ -15,32 +15,28 @@ export interface BarChartData {
 
 // Define our custom PDFKit type
 export type CustomPDFKit = PDFKit.PDFDocument & {
-  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, anticlockwise?: boolean): CustomPDFKit;
-  addPage(): CustomPDFKit;
+  arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, anticlockwise?: boolean): PDFKit.PDFDocument;
+  addPage(): PDFKit.PDFDocument;
   page: PDFKit.PDFPage;
-  fontSize(size: number): CustomPDFKit;
-  font(font: string): CustomPDFKit;
-  text: {
-    (text: string, x?: number, y?: number, options?: PDFKit.Mixins.TextOptions): CustomPDFKit;
-    (text: string, options?: PDFKit.Mixins.TextOptions): CustomPDFKit;
-  };
-  moveDown(lines?: number): CustomPDFKit;
-  rect(x: number, y: number, width: number, height: number): CustomPDFKit;
-  fillColor(color: string): CustomPDFKit;
-  fill(): CustomPDFKit;
-  save(): CustomPDFKit;
-  restore(): CustomPDFKit;
-  moveTo(x: number, y: number): CustomPDFKit;
-  lineTo(x: number, y: number): CustomPDFKit;
-  lineWidth(width: number): CustomPDFKit;
-  translate(x: number, y: number): CustomPDFKit;
+  fontSize(size: number): PDFKit.PDFDocument;
+  font(font: string): PDFKit.PDFDocument;
+  text(text: string, x?: number, y?: number, options?: PDFKit.Mixins.TextOptions): PDFKit.PDFDocument;
+  text(text: string, options?: PDFKit.Mixins.TextOptions): PDFKit.PDFDocument;
+  moveDown(lines?: number): PDFKit.PDFDocument;
+  rect(x: number, y: number, width: number, height: number): PDFKit.PDFDocument;
+  fillColor(color: string): PDFKit.PDFDocument;
+  fill(): PDFKit.PDFDocument;
+  save(): PDFKit.PDFDocument;
+  restore(): PDFKit.PDFDocument;
+  moveTo(x: number, y: number): PDFKit.PDFDocument;
+  lineTo(x: number, y: number): PDFKit.PDFDocument;
+  lineWidth(width: number): PDFKit.PDFDocument;
+  translate(x: number, y: number): PDFKit.PDFDocument;
   widthOfString(text: string): number;
   y: number;
   x: number;
-  image: {
-    (src: string | Buffer, x?: number, y?: number, options?: PDFKit.Mixins.ImageOption): CustomPDFKit;
-    (src: string | Buffer, options?: PDFKit.Mixins.ImageOption): CustomPDFKit;
-  };
+  image(src: string | Buffer, x?: number, y?: number, options?: PDFKit.Mixins.ImageOption): PDFKit.PDFDocument;
+  image(src: string | Buffer, options?: PDFKit.Mixins.ImageOption): PDFKit.PDFDocument;
 };
 
 // Function to add header to each page (for all pages except the first)
