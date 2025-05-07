@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "COSMO RLT Stats Application",
   "scripts": {
-    "build": "bash -c 'cd backend && npm install && npm run build && cd ../frontend && npm install && npm run build && npm install -g serve'",
+    "build": "bash -c 'cd backend && npm install && npm install --save-dev @types/pdfkit && npm run build && cd ../frontend && npm install && npm run build && npm install -g serve'",
     "start:backend": "cd backend && npm start",
     "start:frontend": "cd frontend && serve -s build -l 4000"
   }
