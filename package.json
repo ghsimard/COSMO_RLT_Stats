@@ -4,7 +4,7 @@
   "description": "COSMO RLT Stats Application",
   "scripts": {
     "build": "bash -c 'cd backend && npm install && npm install --save-dev @types/pdfkit && npm run build && cd ../frontend && npm install && npm run build && npm install -g serve'",
-    "start": "bash -c 'cd backend && npm start & cd ../frontend && serve -s build -l 4000'",
+    "start": "bash -c '(cd backend && npm start) & (cd frontend && serve -s build -l 4000)'",
     "start:backend": "cd backend && npm start",
     "start:frontend": "cd frontend && serve -s build -l 4000"
   }
