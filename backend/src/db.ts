@@ -7,7 +7,10 @@ dotenv.config();
 console.log('Attempting to connect to database with connection string:', config.database.connectionString.replace(/:[^:@]*@/, ':****@'));
 
 export const pool = new Pool({
-  connectionString: config.database.connectionString
+  connectionString: config.database.connectionString,
+  ssl: {
+    rejectUnauthorized: false // Required for Render PostgreSQL
+  }
 });
 
 // Test the connection
