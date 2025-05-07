@@ -983,10 +983,23 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
     const chartData = result.rows.map(row => {
       const percentage = ((row.count / total) * 100).toFixed(1);
       console.log(`Processing category ${row.category}: count=${row.count}, percentage=${percentage}%`);
+      
+      // Normalize the grade format to handle both ° and º symbols
+      const normalizedGrade = row.category.replace(/[°º]/g, 'º');
+      console.log('Normalized grade:', normalizedGrade);
+      
+      const color = categoryConfig[normalizedGrade]?.color;
+      console.log(`Color lookup for ${row.category}:`, {
+        original: row.category,
+        normalized: normalizedGrade,
+        hasMapping: normalizedGrade in categoryConfig,
+        color: color || '#000000'
+      });
+      
       return {
-        label: `${categoryConfig[row.category].label} (${percentage}%)`,
+        label: `${categoryConfig[normalizedGrade].label} (${percentage}%)`,
         value: row.count,
-        color: categoryConfig[row.category].color
+        color: color || '#000000'
       };
     });
 
@@ -1171,7 +1184,7 @@ async function getGradosEstudiantesDistribution(school: string): Promise<PieChar
     const result = await pool.query(query, [school]);
 
     // Define colors for each grade
-    const gradeColors: { [key: string]: string } = {
+    const gradeColors: Record<string, string> = {
       'Preescolar': '#FF9F40',      // Warm Orange
       'Primera infancia': '#FF9F40', // Same as Preescolar
       '1': '#4472C4',               // Blue
@@ -1240,84 +1253,62 @@ async function getGradosEstudiantesDistribution(school: string): Promise<PieChar
 } 
 
 // Add helper functions for estudiantes charts
-async function getGradesDistributionForEstudiantes(school: string): Promise<PieChartData[]> {
+async function getGradesDistributionForEstudiantes(school: string) {
   try {
+    // First verify if we have data for this school
+    const verifyQuery = `
+      SELECT COUNT(*) 
+      FROM estudiantes_form_submissions 
+      WHERE institucion_educativa = $1
+    `;
+    const verifyResult = await pool.query(verifyQuery, [school]);
+    console.log('School verification result:', verifyResult.rows[0]);
+
+    if (parseInt(verifyResult.rows[0].count) === 0) {
+      console.log('No data found for school:', school);
+      return [];
+    }
+
+    console.log('Executing grades distribution query...');
     const query = `
-      WITH grade_data AS (
-        SELECT 
-          d.institucion_educativa,
-          CASE
-            WHEN d.grado_actual = '5' THEN 'Quinto'
-            WHEN d.grado_actual = '6' THEN 'Sexto'
-            WHEN d.grado_actual = '7' THEN 'Septimo'
-            WHEN d.grado_actual = '8' THEN 'Octavo'
-            WHEN d.grado_actual = '9' THEN 'Noveno'
-            WHEN d.grado_actual = '10' THEN 'Decimo'
-            WHEN d.grado_actual = '11' THEN 'Undécimo'
-            WHEN d.grado_actual = '12' THEN 'Duodécimo'
-            ELSE d.grado_actual
-          END as grade
-        FROM estudiantes_form_submissions d
-        WHERE d.institucion_educativa = $1
-      )
       SELECT 
-        grade as category,
+        grado_actual as category,
         COUNT(*) as count
-      FROM grade_data
-      GROUP BY grade
-      ORDER BY 
-        CASE grade
-          WHEN 'Quinto' THEN 5
-          WHEN 'Sexto' THEN 6
-          WHEN 'Septimo' THEN 7
-          WHEN 'Octavo' THEN 8
-          WHEN 'Noveno' THEN 9
-          WHEN 'Decimo' THEN 10
-          WHEN 'Undécimo' THEN 11
-          WHEN 'Duodécimo' THEN 12
-          ELSE 99
-        END;
+      FROM estudiantes_form_submissions
+      WHERE institucion_educativa = $1
+      GROUP BY grado_actual
+      ORDER BY CAST(REPLACE(REPLACE(grado_actual, '°', ''), 'º', '') AS INTEGER);
     `;
 
-    console.log('Executing grades distribution query for estudiantes:', query);
     const result = await pool.query(query, [school]);
     console.log('Raw grades distribution result:', result.rows);
 
-    // Define colors for each grade
-    const gradeMapping: Record<string, { color: string }> = {
-      'Quinto': { color: '#4472C4' },    // Blue
-      'Sexto': { color: '#ED7D31' },     // Orange
-      'Septimo': { color: '#A5A5A5' },   // Gray
-      'Octavo': { color: '#FFC000' },    // Yellow
-      'Noveno': { color: '#5B9BD5' },    // Light Blue
-      'Decimo': { color: '#70AD47' },    // Green
-      'Undécimo': { color: '#7030A0' },  // Purple
-      'Duodécimo': { color: '#C00000' }  // Dark Red
-    };
-
-    const total = result.rows.reduce((sum, row) => sum + row.count, 0);
+    const total = result.rows.reduce((sum, row) => sum + parseInt(row.count), 0);
     console.log('Total count:', total);
 
-    const chartData = result.rows.map(row => {
-      const percentage = total > 0 ? ((row.count / total) * 100).toFixed(1) : '0.0';
-      console.log(`Processing category ${row.category}: count=${row.count}, percentage=${percentage}%`);
+    const gradeColors: Record<string, string> = {
+      '5': '#4472C4',  // Blue
+      '6': '#ED7D31',  // Orange
+      '7': '#A5A5A5',  // Gray
+      '8': '#FFC000',  // Yellow
+      '9': '#5B9BD5',  // Light Blue
+      '10': '#70AD47', // Green
+      '11': '#7030A0', // Purple
+      '12': '#C00000'  // Dark Red
+    };
+
+    return result.rows.map(row => {
+      const grade = row.category.replace('°', '').replace('º', '');
+      const percentage = total > 0 ? (parseInt(row.count) / total * 100).toFixed(1) : '0.0';
       return {
-        label: row.category,
+        label: `${grade}° (${percentage}%)`,
         value: parseInt(row.count),
-        color: gradeMapping[row.category]?.color || '#000000'
+        color: gradeColors[grade] || '#000000'
       };
     });
-
-    console.log('Final chart data:', chartData);
-    return chartData;
   } catch (error) {
     console.error('Error in getGradesDistributionForEstudiantes:', error);
-    return [
-      { label: 'Preescolar', value: 0, color: '#FF9F40' },
-      { label: 'Primaria', value: 0, color: '#4B89DC' },
-      { label: 'Secundaria', value: 0, color: '#37BC9B' },
-      { label: 'Media', value: 0, color: '#967ADC' }
-    ];
+    return [];
   }
 }
 
@@ -1483,6 +1474,36 @@ app.get('/api/debug-grades', async (req, res) => {
     });
   } catch (error) {
     console.error('Error in debug endpoint:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}); 
+
+// Add endpoint for estudiantes grades
+app.get('/api/estudiantes-grades', async (req, res) => {
+  try {
+    const school = req.query.school as string;
+    if (!school) {
+      console.log('Missing school parameter');
+      return res.status(400).json({ error: 'School parameter is required' });
+    }
+    
+    console.log('Getting grades distribution for school:', school);
+    const data = await getGradesDistributionForEstudiantes(decodeURIComponent(school));
+    console.log('Grades distribution data:', JSON.stringify(data, null, 2));
+    
+    res.json({
+      school: decodeURIComponent(school),
+      data,
+      debug: {
+        school: decodeURIComponent(school),
+        rawData: data
+      }
+    });
+  } catch (error) {
+    console.error('Error in estudiantes-grades endpoint:', error);
     res.status(500).json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

@@ -1,11 +1,10 @@
 import axios from 'axios';
 import { FrequencyData } from '../types';
-
-const REACT_APP_API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:4001';
+import { config } from '../config';
 
 export const getFrequencyRatings = async (): Promise<FrequencyData[]> => {
   try {
-    const response = await axios.get(`${REACT_APP_API_BASE_URL}/api/frequency-ratings`);
+    const response = await axios.get(`${config.api.baseUrl}/api/frequency-ratings`);
     return response.data;
   } catch (error) {
     console.error('Error fetching frequency ratings:', error);

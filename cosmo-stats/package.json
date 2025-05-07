@@ -11,6 +11,8 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
+    "@types/chart.js": "^2.9.41",
+    "@types/recharts": "^1.8.29",
     "ajv": "^8.17.1",
     "axios": "^1.9.0",
     "chart.js": "^4.4.9",
@@ -19,10 +21,11 @@
     "react-dom": "18.2.0",
     "react-router-dom": "^5.3.4",
     "react-scripts": "5.0.1",
+    "recharts": "^2.15.3",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "PORT=3000 react-scripts start",
+    "start": "PORT=4000 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

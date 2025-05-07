@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { FrequencyData, GridItem, FrequencyResult } from '../types';
 import Spinner from './Spinner';
-
-const REACT_APP_API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:4001';
+import { config } from '../config';
 
 interface FrequencyGridProps {
   className?: string;
@@ -17,7 +16,7 @@ const FrequencyGrid: React.FC<FrequencyGridProps> = ({ className }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(`${REACT_APP_API_BASE_URL}/api/frequency-ratings`);
+        const response = await axios.get(`${config.api.baseUrl}/api/frequency-ratings`);
         setData(response.data);
         setError(null);
       } catch (err) {

@@ -15,13 +15,16 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
-  Button
+  Button,
+  Grid
 } from '@mui/material';
 import { getFrequencyRatings } from '../services/databaseService';
 import { FrequencyData } from '../types';
 import Spinner from './Spinner';
 import './FrequencyChart.css';
 import DownloadIcon from '@mui/icons-material/Download';
+import { config } from '../config';
+import { GradesPieChart } from './GradesPieChart';
 
 export const FrequencyChart: React.FC = () => {
   const [data, setData] = useState<FrequencyData[]>([]);
@@ -34,8 +37,20 @@ export const FrequencyChart: React.FC = () => {
   useEffect(() => {
     const fetchSchools = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/monitoring`);
-        if (!response.ok) throw new Error('Error al cargar las escuelas');
+        const response = await fetch(`${config.api.baseUrl}/api/monitoring`, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          const text = await response.text();
+          if (text.toLowerCase().includes('<!doctype')) {
+            throw new Error('El servidor no está respondiendo correctamente. Por favor, verifica que el servidor esté en ejecución.');
+          }
+          throw new Error(`Error al cargar las escuelas: ${response.status} ${response.statusText}`);
+        }
         
         // Add type definition for the response data
         interface SchoolData {
@@ -53,6 +68,7 @@ export const FrequencyChart: React.FC = () => {
         setSchools(uniqueSchools);
       } catch (err) {
         console.error('Error fetching schools:', err);
+        setError(err instanceof Error ? err.message : 'Error al cargar las escuelas');
       }
     };
 
@@ -64,13 +80,53 @@ export const FrequencyChart: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setError(null);
         const frequencyData = await getFrequencyRatings(selectedSchool);
         console.log('Received data:', frequencyData);
+        
+        // Validate that frequencyData is an array
+        if (!frequencyData) {
+          console.error('No data received from server');
+          setError('No se recibieron datos del servidor');
+          setData([]);
+          return;
+        }
+        
+        if (!Array.isArray(frequencyData)) {
+          console.error('Expected array but received:', typeof frequencyData);
+          setError('Formato de datos inválido recibido del servidor');
+          setData([]);
+          return;
+        }
+        
+        if (frequencyData.length === 0) {
+          console.log('Received empty array from server');
+          setData([]);
+          return;
+        }
+        
+        // Validate each item in the array
+        const isValidData = frequencyData.every(item => 
+          item && 
+          typeof item === 'object' && 
+          'title' in item && 
+          'questions' in item &&
+          Array.isArray(item.questions)
+        );
+        
+        if (!isValidData) {
+          console.error('Invalid data structure received:', frequencyData);
+          setError('Estructura de datos inválida recibida del servidor');
+          setData([]);
+          return;
+        }
+        
         setData(frequencyData);
-        setLoading(false);
       } catch (err) {
         console.error('Error fetching data:', err);
-        setError('Error loading frequency data');
+        setError(err instanceof Error ? err.message : 'Error al cargar los datos de frecuencia');
+        setData([]);
+      } finally {
         setLoading(false);
       }
     };
@@ -85,7 +141,7 @@ export const FrequencyChart: React.FC = () => {
   const handleDownloadPDF = async () => {
     try {
       console.log('Starting PDF download process');
-      const apiUrl = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/generate-pdf${selectedSchool ? `?school=${encodeURIComponent(selectedSchool)}` : ''}`;
+      const apiUrl = `${config.api.baseUrl}/api/generate-pdf${selectedSchool ? `?school=${encodeURIComponent(selectedSchool)}` : ''}`;
       console.log('API URL:', apiUrl);
       
       console.log('Sending fetch request...');
@@ -143,7 +199,7 @@ export const FrequencyChart: React.FC = () => {
     try {
       setLoading(true);
       console.log('Starting all PDFs generation process');
-      const apiUrl = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/generate-all-pdfs`;
+      const apiUrl = `${config.api.baseUrl}/api/generate-all-pdfs`;
       console.log('API URL:', apiUrl);
       
       console.log('Sending fetch request...');
@@ -305,7 +361,28 @@ export const FrequencyChart: React.FC = () => {
           ))}
         </Select>
       </FormControl>
-      {data?.map((section, sectionIndex) => (
+
+      {selectedSchool && (
+        <Grid container spacing={3} sx={{ mt: 2, mb: 4 }}>
+          <Grid item xs={12} md={4}>
+            <Paper elevation={3} sx={{ p: 2 }}>
+              <GradesPieChart school={selectedSchool} type="docentes" />
+            </Paper>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Paper elevation={3} sx={{ p: 2 }}>
+              <GradesPieChart school={selectedSchool} type="estudiantes" />
+            </Paper>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Paper elevation={3} sx={{ p: 2 }}>
+              <GradesPieChart school={selectedSchool} type="acudientes" />
+            </Paper>
+          </Grid>
+        </Grid>
+      )}
+
+      {Array.isArray(data) && data.map((section, sectionIndex) => (
         <Box key={sectionIndex} sx={{ mb: 4 }}>
           <Typography variant="h5" component="h2" gutterBottom sx={{ mt: 4, mb: 2 }}>
             {section.title}

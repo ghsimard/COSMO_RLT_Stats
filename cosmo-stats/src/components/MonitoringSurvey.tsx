@@ -25,8 +25,9 @@ import ContactPhoneIcon from '@mui/icons-material/ContactPhone';
 import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
 import { GradesPieChart } from './GradesPieChart';
+import { config } from '../config';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
+const API_BASE_URL = config.api.baseUrl;
 
 interface SchoolMonitoringData {
   schoolName: string;
@@ -144,7 +145,11 @@ export const MonitoringSurvey: React.FC = () => {
         const data = await response.json();
         console.log('API Response:', data);
         console.log('First school currentPosition:', data[0]?.currentPosition);
-        setSchools(data);
+        // Sort schools alphabetically by name
+        const sortedData = [...data].sort((a, b) => 
+          a.schoolName.localeCompare(b.schoolName)
+        );
+        setSchools(sortedData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error desconocido');
       } finally {
@@ -249,7 +254,7 @@ export const MonitoringSurvey: React.FC = () => {
                   <Typography variant="h6" gutterBottom>
                     Distribución de Grados - {selectedSchool.schoolName}
                   </Typography>
-                  <GradesPieChart school={selectedSchool.schoolName} />
+                  <GradesPieChart school={selectedSchool.schoolName} type="estudiantes" />
                 </Box>
               </Paper>
             </Box>

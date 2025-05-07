@@ -12,6 +12,7 @@ import {
   ChartOptions
 } from 'chart.js';
 import { Box, Typography } from '@mui/material';
+import { config } from '../config';
 
 // Register Chart.js components
 ChartJS.register(
@@ -25,6 +26,7 @@ ChartJS.register(
 
 interface GradesPieChartProps {
   school: string;
+  type?: 'docentes' | 'estudiantes' | 'acudientes';
 }
 
 interface PieChartData {
@@ -41,7 +43,7 @@ interface ApiResponse {
   };
 }
 
-export const GradesPieChart: React.FC<GradesPieChartProps> = ({ school }) => {
+export const GradesPieChart: React.FC<GradesPieChartProps> = ({ school, type = 'docentes' }) => {
   const [data, setData] = useState<PieChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,16 +52,38 @@ export const GradesPieChart: React.FC<GradesPieChartProps> = ({ school }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        // Use the correct endpoint for each type
+        const endpoint = type === 'estudiantes' ? 'estudiantes-grades' : 'test-grades';
+        console.log('Fetching data from endpoint:', endpoint, 'for school:', school, 'type:', type);
+        
         const response = await fetch(
-          `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001'}/api/test-grades?school=${encodeURIComponent(school)}`
+          `${config.api.baseUrl}/api/${endpoint}?school=${encodeURIComponent(school)}`
         );
 
         if (!response.ok) {
-          throw new Error('Failed to fetch data');
+          throw new Error(`Failed to fetch data: ${response.status} ${response.statusText}`);
         }
 
         const result: ApiResponse = await response.json();
-        setData(result.data);
+        console.log('Raw API response:', JSON.stringify(result, null, 2));
+        
+        // Ensure each item has a color and log the color assignment
+        const processedData = result.data.map(item => {
+          const color = item.color || '#000000';
+          console.log(`Processing item:`, {
+            label: item.label,
+            value: item.value,
+            originalColor: item.color,
+            finalColor: color
+          });
+          return {
+            ...item,
+            color
+          };
+        });
+        
+        console.log('Processed data with colors:', JSON.stringify(processedData, null, 2));
+        setData(processedData);
       } catch (err) {
         console.error('Error fetching pie chart data:', err);
         setError(err instanceof Error ? err.message : 'Error loading data');
@@ -71,7 +95,7 @@ export const GradesPieChart: React.FC<GradesPieChartProps> = ({ school }) => {
     if (school) {
       fetchData();
     }
-  }, [school]);
+  }, [school, type]);
 
   if (loading) {
     return <Typography>Loading...</Typography>;
@@ -85,17 +109,30 @@ export const GradesPieChart: React.FC<GradesPieChartProps> = ({ school }) => {
     return <Typography>No data available</Typography>;
   }
 
+  console.log('Rendering chart with data:', JSON.stringify(data, null, 2));
+
   const chartData = {
     labels: data.map(item => item.label),
     datasets: [
       {
         data: data.map(item => item.value),
-        backgroundColor: data.map(item => item.color),
+        backgroundColor: data.map(item => {
+          const color = item.color || '#000000';
+          console.log(`Setting color for ${item.label}:`, {
+            label: item.label,
+            value: item.value,
+            color: color
+          });
+          return color;
+        }),
         borderColor: Array(data.length).fill('#ffffff'),
         borderWidth: 2,
+        hoverOffset: 4,
       },
     ],
   };
+
+  console.log('Final chart data:', JSON.stringify(chartData, null, 2));
 
   const options: ChartOptions<'pie'> = {
     responsive: true,
@@ -106,7 +143,10 @@ export const GradesPieChart: React.FC<GradesPieChartProps> = ({ school }) => {
         labels: {
           font: {
             size: 12
-          }
+          },
+          padding: 20,
+          usePointStyle: true,
+          pointStyle: 'circle'
         }
       },
       tooltip: {
