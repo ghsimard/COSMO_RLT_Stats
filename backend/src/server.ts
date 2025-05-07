@@ -1,5 +1,18 @@
+import express from 'express';
+import cors from 'cors';
 import { Pool } from 'pg';
 import { PieChartData } from './types';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+const app = express();
+const port = process.env.PORT || 4000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
 
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -92,4 +105,26 @@ async function getGradesDistribution(school: string): Promise<PieChartData[]> {
       { label: '6°', value: 0, color: '#70AD47' }
     ];
   }
-} 
+}
+
+// Routes
+app.get('/api/grades/:school', async (req, res) => {
+  try {
+    const { school } = req.params;
+    const data = await getGradesDistribution(school);
+    res.json(data);
+  } catch (error) {
+    console.error('Error in /api/grades route:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// Start server
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+}); 
