@@ -1,22 +1,14 @@
 import { Pool } from 'pg';
+import { config } from './config';
 const dotenv = require('dotenv');
 
 dotenv.config();
 
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'COSMO_RLT',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || ''
-};
+console.log('Attempting to connect to database with connection string:', config.database.connectionString.replace(/:[^:@]*@/, ':****@'));
 
-console.log('Attempting to connect to database with config:', {
-  ...dbConfig,
-  password: '***' // Hide password in logs
+export const pool = new Pool({
+  connectionString: config.database.connectionString
 });
-
-export const pool = new Pool(dbConfig);
 
 // Test the connection
 pool.query('SELECT NOW()')
