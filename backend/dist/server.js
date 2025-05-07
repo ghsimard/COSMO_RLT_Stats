@@ -18,8 +18,10 @@ const db_1 = require("./db");
 const pdfGenerator_1 = require("./pdf-modules/pdfGenerator");
 const config_1 = require("./config");
 const app = (0, express_1.default)();
-const port = config_1.config.port;
-app.use((0, cors_1.default)());
+const port = config_1.config.ports.backend;
+app.use((0, cors_1.default)({
+    origin: config_1.config.cors.origin
+}));
 app.use(express_1.default.json());
 // Test query to check table access and column names
 db_1.pool.query('SELECT column_name FROM information_schema.columns WHERE table_name = \'docentes_form_submissions\'')
@@ -339,6 +341,17 @@ app.get('/api/frequency-ratings', (req, res) => __awaiter(void 0, void 0, void 0
     try {
         const school = req.query.school;
         console.log(`Fetching frequency ratings${school ? ` for school: ${school}` : ' for all schools'}`);
+        // Check if tables exist
+        const tables = ['docentes_form_submissions', 'estudiantes_form_submissions', 'acudientes_form_submissions'];
+        for (const table of tables) {
+            try {
+                const result = yield db_1.pool.query(`SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = $1)`, [table]);
+                console.log(`Table ${table} exists:`, result.rows[0].exists);
+            }
+            catch (error) {
+                console.error(`Error checking if table ${table} exists:`, error);
+            }
+        }
         const results = [];
         for (const [sectionKey, section] of Object.entries(sections)) {
             const sectionData = {
@@ -587,10 +600,9 @@ function drawPieChart(doc, data, centerX, centerY, radius, title, isFirstChart =
             width: radius * 2,
             align: 'center'
         });
-        // Draw pie segments with percentages
+        // Draw pie segments
         data.forEach(item => {
             const segmentAngle = (item.value / total) * 2 * Math.PI;
-            const percentage = Math.round((item.value / total) * 100);
             // Draw segment
             doc.save()
                 .moveTo(centerX, centerY)
@@ -598,21 +610,6 @@ function drawPieChart(doc, data, centerX, centerY, radius, title, isFirstChart =
                 .lineTo(centerX, centerY)
                 .fillColor(item.color)
                 .fill();
-            // Calculate position for percentage text
-            const midAngle = currentAngle + (segmentAngle / 2);
-            const textRadius = radius * 0.65;
-            const textX = centerX + Math.cos(midAngle) * textRadius;
-            const textY = centerY + Math.sin(midAngle) * textRadius;
-            // Draw percentage with white text
-            if (percentage > 3) {
-                doc.fillColor('white')
-                    .fontSize(9)
-                    .font('Helvetica-Bold')
-                    .text(`${percentage}%`, textX - 12, textY - 5, {
-                    width: 24,
-                    align: 'center'
-                });
-            }
             doc.restore();
             currentAngle += segmentAngle;
         });
@@ -853,8 +850,7 @@ function getGradesDistribution(school) {
             // Transform the data and calculate percentages
             const chartData = result.rows.map(row => {
                 var _a;
-                const percentage = ((row.count / total) * 100).toFixed(1);
-                console.log(`Processing category ${row.category}: count=${row.count}, percentage=${percentage}%`);
+                console.log(`Processing category ${row.category}: count=${row.count}`);
                 // Normalize the grade format to handle both ° and º symbols
                 const normalizedGrade = row.category.replace(/[°º]/g, 'º');
                 console.log('Normalized grade:', normalizedGrade);
@@ -866,7 +862,7 @@ function getGradesDistribution(school) {
                     color: color || '#000000'
                 });
                 return {
-                    label: `${categoryConfig[normalizedGrade].label} (${percentage}%)`,
+                    label: categoryConfig[normalizedGrade].label,
                     value: row.count,
                     color: color || '#000000'
                 };
@@ -1110,76 +1106,52 @@ function getGradosEstudiantesDistribution(school) {
 function getGradesDistributionForEstudiantes(school) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            // First verify if we have data for this school
-            const verifyQuery = `
-      SELECT COUNT(*) 
-      FROM estudiantes_form_submissions 
-      WHERE institucion_educativa = $1
-    `;
-            const verifyResult = yield db_1.pool.query(verifyQuery, [school]);
-            console.log('School verification result:', verifyResult.rows[0]);
-            if (parseInt(verifyResult.rows[0].count) === 0) {
-                console.log('No data found for school:', school);
-                return [];
-            }
-            console.log('Executing grades distribution query...');
             const query = `
-      WITH grade_data AS (
-        SELECT 
-          d.institucion_educativa,
-          CASE
-            WHEN d.grado_actual = '5' THEN 'Quinto'
-            WHEN d.grado_actual = '6' THEN 'Sexto'
-            WHEN d.grado_actual = '7' THEN 'Séptimo'
-            WHEN d.grado_actual = '8' THEN 'Octavo'
-            WHEN d.grado_actual = '9' THEN 'Noveno'
-            WHEN d.grado_actual = '10' THEN 'Décimo'
-            WHEN d.grado_actual = '11' THEN 'Undécimo'
-            WHEN d.grado_actual = '12' THEN 'Duodécimo'
-            ELSE d.grado_actual
-          END as grade
-        FROM estudiantes_form_submissions d
-        WHERE d.institucion_educativa = $1
-      )
       SELECT 
-        grade as category,
+        grado_actual as category,
         COUNT(*) as count
-      FROM grade_data
-      GROUP BY grade
-      ORDER BY 
-        CASE grade
-          WHEN 'Quinto' THEN 5
-          WHEN 'Sexto' THEN 6
-          WHEN 'Séptimo' THEN 7
-          WHEN 'Octavo' THEN 8
-          WHEN 'Noveno' THEN 9
-          WHEN 'Décimo' THEN 10
-          WHEN 'Undécimo' THEN 11
-          WHEN 'Duodécimo' THEN 12
-          ELSE 99
-        END;
+      FROM estudiantes_form_submissions
+      WHERE institucion_educativa = $1
+      GROUP BY grado_actual
+      ORDER BY CAST(REPLACE(REPLACE(grado_actual, '°', ''), 'º', '') AS INTEGER);
     `;
+            console.log('Executing grades distribution query for estudiantes:', query);
             const result = yield db_1.pool.query(query, [school]);
             console.log('Raw grades distribution result:', result.rows);
+            // Define colors for each grade
+            const gradeColors = {
+                '5': '#4472C4', // Blue
+                '6': '#ED7D31', // Orange
+                '7': '#A5A5A5', // Gray
+                '8': '#FFC000', // Yellow
+                '9': '#5B9BD5', // Light Blue
+                '10': '#70AD47', // Green
+                '11': '#7030A0', // Purple
+                '12': '#C00000' // Dark Red
+            };
+            // Map grade numbers to Spanish names
+            const gradeNames = {
+                '5': 'Quinto',
+                '6': 'Sexto',
+                '7': 'Séptimo',
+                '8': 'Octavo',
+                '9': 'Noveno',
+                '10': 'Décimo',
+                '11': 'Undécimo',
+                '12': 'Duodécimo'
+            };
             const total = result.rows.reduce((sum, row) => sum + parseInt(row.count), 0);
             console.log('Total count:', total);
-            const gradeColors = {
-                'Quinto': '#4472C4', // Blue
-                'Sexto': '#ED7D31', // Orange
-                'Séptimo': '#A5A5A5', // Gray
-                'Octavo': '#FFC000', // Yellow
-                'Noveno': '#5B9BD5', // Light Blue
-                'Décimo': '#70AD47', // Green
-                'Undécimo': '#7030A0', // Purple
-                'Duodécimo': '#C00000' // Dark Red
-            };
-            return result.rows.map(row => {
+            const chartData = result.rows.map((row) => {
+                const grade = row.category.replace('°', '').replace('º', '');
                 return {
-                    label: row.category,
+                    label: gradeNames[grade] || grade,
                     value: parseInt(row.count),
-                    color: gradeColors[row.category] || '#000000'
+                    color: gradeColors[grade] || '#000000'
                 };
             });
+            console.log('Final chart data:', chartData);
+            return chartData;
         }
         catch (error) {
             console.error('Error in getGradesDistributionForEstudiantes:', error);

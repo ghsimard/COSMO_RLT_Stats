@@ -12,18 +12,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.pool = void 0;
 exports.getTableColumns = getTableColumns;
 const pg_1 = require("pg");
+const config_1 = require("./config");
 const dotenv = require('dotenv');
 dotenv.config();
-const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    database: process.env.DB_NAME || 'COSMO_RLT',
-    user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || ''
-};
-console.log('Attempting to connect to database with config:', Object.assign(Object.assign({}, dbConfig), { password: '***' // Hide password in logs
- }));
-exports.pool = new pg_1.Pool(dbConfig);
+console.log('Attempting to connect to database with connection string:', config_1.config.database.connectionString.replace(/:[^:@]*@/, ':****@'));
+exports.pool = new pg_1.Pool({
+    connectionString: config_1.config.database.connectionString,
+    ssl: {
+        rejectUnauthorized: false // Required for Render PostgreSQL
+    }
+});
 // Test the connection
 exports.pool.query('SELECT NOW()')
     .then(() => {
